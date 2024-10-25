@@ -9,6 +9,7 @@ import 'package:distributers_app/view/salesInvoice.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../assets.dart' as app_assets;
 import '../components/menu_row.dart';
 import '../models/menu_dart.dart'; // Ensure the correct import path
@@ -29,6 +30,30 @@ class _SideMenuState extends State<SideMenu> {
   final List<MenuItemModel> _themeMenuIcon = MenuItemModel.menuItems3;
   String _selectedMenu = MenuItemModel.menuItems[0].title;
   bool _isDarkMode = false;
+  String? name = '';
+  String? division;
+
+  @override
+  void initState() {
+    getProfile();
+    super.initState();
+  }
+  Future<void> getProfile() async {
+    name = await _getName();
+    division = await _getDivision();
+  }
+
+
+  Future<String?> _getName() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString("user"); // Replace with your key
+  }
+
+  Future<String?> _getDivision() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString("division"); // Replace with your key
+  }
+
 
   void onThemeRiveIconInit(Artboard artboard) {
     if (_themeMenuIcon.isNotEmpty && _themeMenuIcon[0].riveIcon != null) {
@@ -107,9 +132,9 @@ class _SideMenuState extends State<SideMenu> {
             Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children:  [
                 Text(
-                  "ADMIN",
+                  name! ?? '',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 15,
@@ -118,13 +143,16 @@ class _SideMenuState extends State<SideMenu> {
                 ),
                 SizedBox(height: 2),
                 Text(
-                  "SATARA DISTRIBUTERS",
+                  division ?? '',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 13,
                     fontFamily: "Inter",
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1, // Limits the text to one line
                 ),
+
               ],
             ),
           ],

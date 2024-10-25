@@ -6,11 +6,13 @@ import 'newSalesOrder.dart';
 class SlidingProductPanel extends StatefulWidget {
   final List<ProductListItem> productListItem;
   final Widget child;
+  final Function(List<ProductListItem>)? onProductListUpdated; // Add callback
 
   const SlidingProductPanel({
     Key? key,
     required this.productListItem,
     required this.child,
+    this.onProductListUpdated,
   }) : super(key: key);
 
   @override
@@ -139,7 +141,14 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
     );
   }
 
-
+  void updateProductList(List<ProductListItem> updatedList) {
+    setState(() {
+      widget.productListItem.clear();
+      widget.productListItem.addAll(updatedList);
+      widget.onProductListUpdated?.call(updatedList);
+      _badgeController.forward(from: 0.0); // Animate the badge
+    });
+  }
 
 
   Widget _buildPanelContent(BuildContext context) {
@@ -209,6 +218,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
                     Expanded(
                       child: ProductListWidget(
                         productListItem: widget.productListItem,
+                        onProductListUpdated: updateProductList,
                       ),
                     ),
                   ],

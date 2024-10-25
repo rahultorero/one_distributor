@@ -12,6 +12,11 @@ import '../dataModels/Invoice.dart';
 import '../dataModels/StoreModel.dart'; // To format dates
 import 'package:http/http.dart' as http;
 
+class StatusConfig {
+  final Color color;
+  StatusConfig(this.color);
+}
+
 
 class SalesInvoiceScreen extends StatefulWidget {
   @override
@@ -20,24 +25,58 @@ class SalesInvoiceScreen extends StatefulWidget {
 
 class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
   List<Invoice> invoices = []; // This will hold the fetched invoices
-  String? selectedRegCode;
+  List<Invoice> filteredInvoices = []; // This will hold the fetched invoices
+
   String? selectedCompanyName;
   int? selectedCompanyId;
   String userSearch = '';
   String startDate = ''; // Default start date
   String endDate = ''; // Default end date
-
+  bool _isDropdownVisible = false;
+  bool _isSearchVisible = false;
+  bool _isDateRangeVisible = false;
   // Text editing controllers for date fields
   TextEditingController startDateController = TextEditingController();
   TextEditingController endDateController = TextEditingController();
-
+  TextEditingController searchController = TextEditingController();
+  DateTimeRange? _selectedDateRange;
+  String? formattedStartDate;
+  String? formattedEndDate;
   String? regCode;
   List<Store> stores = [];
   bool isLoading = true; // To manage loading state
   @override
   void initState() {
     super.initState();
+
     _fetchDivisionAndCompanies(); // Fetch data on init
+    filteredInvoices = invoices;
+
+    searchController.addListener(() {
+      filterOrders(searchController.text);
+    });
+  }
+
+  void filterOrders(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        filteredInvoices = invoices; // Reset to original if query is empty
+      });
+    } else {
+      setState(() {
+        filteredInvoices = invoices.where((order) {
+
+          return order.partyname.toLowerCase().contains(query.toLowerCase()) ||
+              order.invno.toString().toLowerCase().contains(query.toLowerCase()) ||
+              order.prefix.toLowerCase().contains(query.toLowerCase()) ||
+              (order.area ?? '').toLowerCase().contains(query.toLowerCase()) ||
+              (order.city ?? '').toLowerCase().contains(query.toLowerCase()) ||
+              (order.invdate ?? '').toLowerCase().contains(query.toLowerCase()) ||
+              (order.duedate ?? '').toLowerCase().contains(query.toLowerCase()) ||
+              (order.invamt ?? '').toString().toLowerCase().contains(query.toLowerCase());
+        }).toList();
+      });
+    }
   }
 
   Future<void> _fetchDivisionAndCompanies() async {
@@ -47,6 +86,8 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
       if (regCode != null) {
         // Fetch companies using the division value
         stores = await fetchCompanies(regCode!);
+        selectedCompanyId = stores[0].companyId;
+        await _fetchInvoices();
       }
     } catch (e) {
       // Handle any errors that occur during fetching
@@ -58,15 +99,28 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
     }
   }
 
+
+
   Future<void> _fetchInvoices() async {
     String apiUrl = ApiConfig.reqInvoiceList(); // Replace with actual API URL
+    DateTime today = DateTime.now();
+
+    // Format dates as 'YYYY-MM-DD'
+    String formatDate(DateTime date) {
+      return '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    }
+
+    // Use provided startDate and endDate or fall back to today's date if they are empty
+    String fromDate = (startDate != null && startDate.isNotEmpty) ? startDate : formatDate(today);
+    String toDate = (endDate != null && endDate.isNotEmpty) ? endDate : formatDate(today);
+
     final body = jsonEncode({
-      "regcode": selectedRegCode,
+      "regcode": regCode?.substring(0, 7),
       "company_id": selectedCompanyId,
       "pagenum": 1,
       "pagesize": 20,
-      "from": startDate, // Ensure this format matches the API expectations
-      "to": endDate, // Adjust the date format if necessary
+      "from": fromDate,  // Use the derived fromDate
+      "to": toDate,      // Use the derived toDate
       "order_key": "AA.invno",
       "order_by": "ASC",
       "userInput": userSearch
@@ -78,8 +132,6 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
       isLoading = true; // Set loading to true when the request starts
     });
 
-
-
     try {
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -88,6 +140,10 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
         },
         body: body,
       );
+
+      // Print response status code and body for debugging
+      print("Response status code: ${response.statusCode}");
+      print("Response body: ${response.body}");
 
       if (response.statusCode == 200) {
         // Decode the JSON response
@@ -99,8 +155,8 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
 
         if (invoiceList != null && invoiceList.isNotEmpty) {
           setState(() {
-            invoices =
-                invoiceList.map((json) => Invoice.fromJson(json)).toList();
+            invoices = invoiceList.map((json) => Invoice.fromJson(json)).toList();
+            filteredInvoices = invoices;
           });
         } else {
           print('No invoices found in the response');
@@ -135,26 +191,33 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
         ),
         centerTitle: true,
         backgroundColor: Colors.blueGrey,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.filter_list),
-            onPressed: () => _showFilterSheet(context),
-          ),
-        ],
+
       ),
       body: isLoading
           ? Center(child: LoadingIndicator())
-      :invoices.isEmpty
+      :filteredInvoices.isEmpty
           ? Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
+            _buildActionButtons(),
+            // Use Visibility to conditionally render filter fields
+            Visibility(
+              visible: _isDropdownVisible || _isSearchVisible || _isDateRangeVisible,
+              child: _buildFilterFields(),
+            ),
+            SizedBox(height: _isDropdownVisible || _isSearchVisible || _isDateRangeVisible ? 8 : 4),
+            SizedBox(height: 120),
             // Animated SVG using Lottie
-            Lottie.asset(
-              'assets/animations/empty_state.json', // Path to your Lottie animation file
-              width: 200, // You can adjust the size as per your need
-              height: 200,
-              fit: BoxFit.fill,
+            Center(
+              child: Container(
+                child: Lottie.asset(
+                  'assets/animations/empty_state.json', // Path to your Lottie animation file
+                  width: 200, // You can adjust the size as per your need
+                  height: 200,
+                  fit: BoxFit.fill,
+                ),
+              ),
             ),
             SizedBox(height: 20),
             Text(
@@ -168,9 +231,142 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
           ],
         ),
       )
-          : SalesInvoiceGrid(invoices: invoices), // Display invoices in a grid format
+          : SalesInvoiceGrid(invoices: filteredInvoices), // Display invoices in a grid format
     );
   }
+  Widget _buildActionButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        IconButton(
+          icon: Icon(
+            Icons.store,
+            color: _isDropdownVisible ? Colors.black : Colors.grey, // Change color based on visibility
+          ),
+          onPressed: () {
+            setState(() {
+              _isDropdownVisible = !_isDropdownVisible; // Toggle dropdown visibility
+            });
+          },
+        ),
+        IconButton(
+          icon: Icon(
+            Icons.search,
+            color: _isSearchVisible ? Colors.black : Colors.grey, // Change color based on visibility
+          ),
+          onPressed: () {
+            setState(() {
+              _isSearchVisible = !_isSearchVisible; // Toggle search visibility
+            });
+          },
+        ),
+        IconButton(
+          icon: Icon(
+            Icons.date_range,
+            color: _isDateRangeVisible ? Colors.black : Colors.grey, // Change color based on visibility
+          ),
+          onPressed: () {
+            setState(() {
+              _isDateRangeVisible = !_isDateRangeVisible; // Toggle date range visibility
+            });
+          },
+        ),
+      ],
+    );
+  }
+  Widget _buildFilterFields() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Dropdown for Store Selection
+        Visibility(
+          visible: _isDropdownVisible,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0), // Adjust vertical padding
+            child: DropdownButtonFormField<Store>(
+              decoration: InputDecoration(
+                labelText: 'Select Store',
+                border: OutlineInputBorder(),
+              ),
+              value: stores.isNotEmpty ? stores[0] : null, // Set the first item as the default
+              items: stores.map((store) {
+                return DropdownMenuItem<Store>(
+                  value: store,
+                  child: Text(store.companyName),
+                );
+              }).toList(),
+              onChanged: (Store? selectedStore) {
+                if (selectedStore != null) {
+                  setState(() {
+                    regCode = selectedStore.regCode; // Store regCode
+                    selectedCompanyName = selectedStore.companyName; // Store companyName
+                    selectedCompanyId = selectedStore.companyId; // Store companyId
+                  });
+                }
+              },
+            ),
+          ),
+        ),
+
+        // Text Field for Order Search
+        Visibility(
+          visible: _isSearchVisible,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0), // Adjust vertical padding
+            child: TextField(
+              controller: searchController,
+              decoration: InputDecoration(
+                labelText: 'Search Orders',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ),
+        ),
+
+        // Date Range Picker
+        Visibility(
+          visible: _isDateRangeVisible,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0), // Adjust vertical padding
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Select Date Range:'),
+                ElevatedButton(
+                  onPressed: () async {
+                    DateTimeRange? pickedRange = await showDateRangePicker(
+                      context: context,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+
+                    if (pickedRange != null) {
+                      setState(() {
+                        _selectedDateRange = pickedRange; // Update selected date range
+
+                        // Format the start and end dates to YYYY-MM-DD
+                        formattedStartDate = DateFormat('yyyy-MM-dd').format(_selectedDateRange!.start);
+                        formattedEndDate = DateFormat('yyyy-MM-dd').format(_selectedDateRange!.end);
+
+                        print("Start Date: $formattedStartDate");
+                        print("End Date: $formattedEndDate");
+
+                        _fetchInvoices();
+                      });
+
+
+                    }
+                  },
+                  child: Text('Pick Range'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
 
 
   Future<List<Store>> fetchCompanies(String regCode) async {
@@ -234,7 +430,7 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
                     onChanged: (selectedStore) {
                       if (selectedStore != null) {
                         setState(() {
-                          selectedRegCode = selectedStore.regCode; // Store regCode
+                          regCode = selectedStore.regCode; // Store regCode
                           selectedCompanyName = selectedStore.companyName; // Store companyName
                           selectedCompanyId = selectedStore.companyId; // Assuming Store has an id field
                         });
@@ -305,7 +501,7 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
                     onPressed: () {
                       // Handle apply action here
                       print('Filters Applied:');
-                      print('Reg Code: $selectedRegCode');
+                      print('Reg Code: $regCode');
                       print('Company Name: $selectedCompanyName');
                       print('Company ID: $selectedCompanyId');
                       print('User Search: $userSearch');
@@ -373,13 +569,14 @@ class SalesInvoiceGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(12.0),
+      padding: const EdgeInsets.all(8.0),
       child: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: MediaQuery.of(context).size.width > 600 ? 2 : 1,
-          childAspectRatio: 1.5,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
+          // Lower the childAspectRatio to increase the height of the card
+          childAspectRatio: 1.4, // Adjust this value to make the card taller
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
         ),
         itemCount: invoices.length,
         itemBuilder: (context, index) {
@@ -387,12 +584,13 @@ class SalesInvoiceGrid extends StatelessWidget {
           return GestureDetector(
             onTap: () => _showInvoiceDetails(context, invoice),
             child: Card(
-              elevation: 8,
+              elevation: 4,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.shade200),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -406,75 +604,198 @@ class SalesInvoiceGrid extends StatelessWidget {
                             children: [
                               Text(
                                 invoice.partyname ?? 'N/A',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: 18,
+                                  color: Color(0xFF2D3748),
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              SizedBox(height: 10),
-                              Text('Invoice No: ${invoice.prefix}/${invoice.invno ?? 'N/A'}',style: TextStyle(fontSize: 15),),
-                              Text('Invoice Date: ${formatDateFromString(invoice.invdate) ?? 'N/A'}',style: TextStyle(fontSize: 15)),
-                              Text('Order No: ${  invoice.orderno ?? 'N/A'}',style: TextStyle(fontSize: 15)),
-                              Text('Order Date: ${formatDateFromString(invoice.orderdate) ?? 'N/A'}',style: TextStyle(fontSize: 15)),
+                              const SizedBox(height: 8),
+                              _buildInfoText('Invoice No', '${invoice.prefix}/${invoice.invno ?? 'N/A'}'),
+                              _buildInfoText('Invoice Date', formatDateFromString(invoice.invdate) ?? 'N/A'),
+                              _buildInfoText('Order No', invoice.orderno ?? 'N/A'),
+                              _buildInfoText('Order Date', formatDateFromString(invoice.orderdate) ?? 'N/A'),
                             ],
                           ),
                         ),
-                        Column(
-                          children: [
-                            _buildStatusWidget(invoice.barcode), // Pass the status code her// Another status
-                          ],
-                        )
-
+                        _buildStatusWidget(invoice.barcode),
                       ],
                     ),
-                    Divider(),
+                    const Divider(height: 24, thickness: 1),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distributes content between left and right
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Left side (INV AMT and Balance)
                         Flexible(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'INV AMT: ₹${invoice.invamt ?? 'N/A'}',
-                                style: TextStyle(color: Colors.blueAccent),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Balance: ₹${invoice.balance ?? 'N/A'}',
-                                style: TextStyle(color: Colors.redAccent),
-                              ),
+                              _buildAmountText('INV AMT', invoice.invamt, Colors.blue.shade700),
+                              _buildAmountText('Balance', invoice.balance, Colors.red.shade700),
                             ],
                           ),
                         ),
-
-                        // Right side (CN AMT and RECD AMT)
                         Flexible(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(
-                                'CN AMT: ₹${invoice.cnamt ?? 'N/A'}', // CN AMT field
-                                style: TextStyle(color: Colors.blueAccent),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'RECD AMT: ₹${invoice.recdamt ?? 'N/A'}', // RECD AMT field
-                                style: TextStyle(color: Colors.redAccent),
-                              ),
+                              _buildAmountText('CN AMT', invoice.cnamt, Colors.blue.shade700),
+                              _buildRECDAmountText('RECD AMT', invoice.recdamt, Colors.green.shade700),
                             ],
                           ),
                         ),
                       ],
-                    )
-
+                    ),
                   ],
                 ),
               ),
             ),
           );
         },
+      ),
+    );
+  }
+
+
+  Widget _buildInfoText(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAmountText(String label, dynamic amount, Color color) {
+    // Handle the amount formatting
+    String formattedAmount = 'N/A';
+    if (amount != null) {
+      try {
+        if (amount is String) {
+          // Try to parse the string to a number for proper formatting
+          final numAmount = double.tryParse(amount);
+          if (numAmount != null) {
+            formattedAmount = '₹${numAmount.toStringAsFixed(2)}';
+          } else {
+            formattedAmount = '₹$amount';
+          }
+        } else if (amount is num) {
+          formattedAmount = '₹${amount.toStringAsFixed(2)}';
+        }
+      } catch (e) {
+        formattedAmount = '₹$amount';
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          formattedAmount,
+          style: TextStyle(
+            fontSize: 15,
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+  Widget _buildRECDAmountText(String label, dynamic amount, Color color) {
+    // Handle the amount formatting
+    String formattedAmount = 'N/A';
+    if (amount != null) {
+      try {
+        if (amount is String) {
+          // Try to parse the string to a number for proper formatting
+          final numAmount = double.tryParse(amount);
+          if (numAmount != null) {
+            formattedAmount = '₹${numAmount.toStringAsFixed(2)}';
+          } else {
+            formattedAmount = '₹$amount';
+          }
+        } else if (amount is num) {
+          formattedAmount = '₹${amount.toStringAsFixed(2)}';
+        }
+      } catch (e) {
+        formattedAmount = '₹$amount';
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          formattedAmount,
+          style: TextStyle(
+            fontSize: 15,
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildStatusWidget(String status) {
+    final statusConfig = _getStatusConfig(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: statusConfig.color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: statusConfig.color.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            _getIconForStatus(status),
+            color: statusConfig.color,
+            size: 20,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _getTextForStatus(status),
+            style: TextStyle(
+              fontSize: 12,
+              color: statusConfig.color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -502,45 +823,50 @@ class SalesInvoiceGrid extends StatelessWidget {
     }
   }
 
+  StatusConfig _getStatusConfig(String status) {
+    switch (status) {
+      case 'CHKED':
+        return StatusConfig(Colors.green.shade700);
+      case 'GDWIN':
+        return StatusConfig(Colors.blue.shade700);
+      case 'GDWOT':
+        return StatusConfig(Colors.orange.shade700);
+      case 'NOPRINT':
+        return StatusConfig(Colors.red.shade700);
+      case 'DCONF':
+        return StatusConfig(Colors.purple.shade700);
+      case 'DELIV':
+        return StatusConfig(Colors.indigo.shade700);
+      case 'PACKD':
+        return StatusConfig(Colors.teal.shade700);
+      case 'PRICF':
+        return StatusConfig(Colors.blue.shade700);
+      default:
+        return StatusConfig(Colors.grey.shade700);
+    }
+  }
   String _getTextForStatus(String status) {
     switch (status) {
       case 'CHKED':
-        return 'CHKED';
+        return 'Checked';
       case 'GDWIN':
-        return 'GDWIN';
+        return 'Godown In';
       case 'GDWOT':
-        return 'GDWOT';
+        return 'Godown Out';
       case 'NOPRINT':
-        return 'NOPRINT';
+        return 'No Print';
       case 'DCONF':
-        return 'DCONF';
+        return 'Delivery Conf';
       case 'DELIV':
-        return 'DELIV';
+        return 'Delivered';
       case 'PACKD':
-        return 'PACKD';
+        return 'Packed';
       case 'PRICF':
-        return 'PRICF';
+        return 'Printed';
       default:
         return 'Unknown';
     }
   }
-
-  Widget _buildStatusWidget(String status) {
-    return Column(
-      children: [
-        Icon(
-          _getIconForStatus(status),
-          color: Colors.green, // You can change this based on status
-        ),
-        SizedBox(height: 8), // Spacing between icon and text
-        Text(
-          _getTextForStatus(status),
-          style: TextStyle(fontSize: 14), // Style the text if needed
-        ),
-      ],
-    );
-  }
-
 
   String formatDateFromString(String? dateString) {
     if (dateString == null || dateString.isEmpty) return 'N/A'; // Return 'N/A' for empty or null strings

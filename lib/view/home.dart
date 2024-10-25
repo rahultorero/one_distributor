@@ -150,7 +150,7 @@ class _HomeState extends State<Home>
               },
               child: FadeTransition(
                 opacity: _sidebarAnim,
-                child: const SideMenu(),
+                child:  SideMenu(),
               ),
             ),
           ),

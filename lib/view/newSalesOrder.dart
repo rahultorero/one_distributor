@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:distributers_app/components/BottomSheetsViews/frequentlyPurchase.dart';
 import 'package:distributers_app/components/LoadingIndicator.dart';
 import 'package:distributers_app/dataModels/FrequentlyPurchase.dart';
 import 'package:distributers_app/dataModels/ReceivableListRes.dart';
 import 'package:distributers_app/view/SalesOrders.dart';
+import 'package:distributers_app/view/draftOrders.dart';
 import 'package:distributers_app/view/slidingProductPanel.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -13,14 +15,18 @@ import 'package:flutter/services.dart';
 
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../components/TutorialStep.dart';
 import '../dataModels/CreateOrderModel.dart';
 import '../dataModels/PartyProductModel.dart';
 import '../dataModels/ProductListModel.dart';
 import '../dataModels/StoreModel.dart';
 import '../services/api_services.dart';
 import 'invoiceDetailBottomSheet.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+
 
 class Customer {
   final int id;
@@ -75,6 +81,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   final TextEditingController _quantityController = TextEditingController();
   List<ProductListItem> productListItem = [];
   bool isLoading = false;
+
   List<Customer> customerList = [];
   List<Party> retailerList = [];
   List<Product> productList = [];
@@ -83,10 +90,26 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   FrequentlyPurchase? frequentlyList;
   FrequentlyPurchase? bouncedList;
 
+  // Add GlobalKeys for each element you want to highlight in the tutorial
+  final GlobalKey frequentlyPurchasedKey = GlobalKey(debugLabel: 'frequentlyPurchasedKey');
+  final GlobalKey bouncedProductsKey = GlobalKey(debugLabel: 'bouncedProductsKey');
+  final GlobalKey customerDropdownKey = GlobalKey(debugLabel: 'customerDropdownKey');
+  final GlobalKey retailerSelectorKey = GlobalKey(debugLabel: 'retailerSelectorKey');
+  final GlobalKey productSelectorKey = GlobalKey(debugLabel: 'productSelectorKey');
+  final GlobalKey showMoreKey = GlobalKey(debugLabel: 'showMoreKey');
+  final GlobalKey addButtonKey = GlobalKey(debugLabel: 'addButtonKey');
+  final GlobalKey osAmountKey = GlobalKey(debugLabel: 'osAmountKey');
+  bool _showTutorial = false; // Add this flag to control tutorial visibility
+
   bool _isExpanded = false;
   @override
   void initState() {
     super.initState();
+
+    print("NewSalesOrder State Initialized"); // Debug print
+    _checkTutorialStatus(); // Add this method to check if tutorial should be shown
+
+
     // The data to populate the list
     List<Map<String, dynamic>> deliveryOptionsData = [
       {"label": "DELIVERY", "value": "1691"},
@@ -141,6 +164,19 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     super.dispose();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Now the widget is built and you can access the keys
+      if (frequentlyPurchasedKey.currentContext != null) {
+        debugPrint('Add Button found');
+      } else {
+        debugPrint('Add Button is not found.');
+      }
+    });
+  }
+
   Future<void> fetchData() async {
     await _fetchDivisionAndCompanies(); // Call the first function and wait for it to complete
     product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: "false",regCode: regCode!,smanId: smid!))!; // Then call the second function
@@ -170,6 +206,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
         // Set selected company ID to the first one in the list
         _selectedCustomerId = stores[0].companyId;
+        _selectGroupCode = stores[0].regCode;
 
         // Optionally, set the default selected customer
         _selectedCustomer = customerList.isNotEmpty ? customerList[0] : null;
@@ -335,8 +372,6 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   }
 
 
-
-
   Future<String?> _getDivision() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     print("check the value ${prefs.getString("reg_code")}");
@@ -487,21 +522,45 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       ),
     );
   }
+  Future<bool> _onWillPop() async {
+    final shouldPop = await showDeleteConfirmationSheet(context);
+    return shouldPop ?? false;
+  }
+
+  Future<void> _checkTutorialStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _showTutorial = prefs.getBool('show_sales_tutorial') ?? true;
+    });
+  }
 
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade200, // Subtle background color
-      body:
-      SlidingProductPanel(productListItem: productListItem,
+    print("Building NewSalesOrder, showTutorial: $_showTutorial"); // Debug print
+
+    Widget mainContent =
+      Scaffold(
+        backgroundColor: Colors.grey.shade200, // Subtle background color
+        body:
+        SlidingProductPanel(productListItem: productListItem,
           child: CustomScrollView(
             slivers: [
               SliverAppBar(
                 expandedHeight: 200.0,
                 floating: false,
                 pinned: true,
-                backgroundColor: Colors.indigo, // Collapsed color
+                backgroundColor: Colors.indigo,
+                leading: IconButton(
+                  icon: Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () async {
+                    // Using the same _onWillPop method for consistency
+                    final shouldPop = await _onWillPop();
+                    if (shouldPop) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(
                     'New Sales Order',
@@ -526,6 +585,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                 ),
                 actions: [
                   IconButton(
+                    key: frequentlyPurchasedKey,
                     icon: Icon(Icons.history, color:  Colors.white70,),
                     tooltip: 'Frequently Purchased',
                     onPressed: () async {
@@ -561,7 +621,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                               ptr: items?.ptr,
                               amount: "0",
                               remark: items.remark,
-                              companyid: _selectedProduct?.dCompanyid,
+                              companyid: items.dCompanyid,
                               pid: items?.pid,
                               odid: 0,
                             ),
@@ -599,6 +659,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                   ),
 
                   IconButton(
+                    key: bouncedProductsKey,
                     icon: Icon(Icons.assignment_return,color: Colors.white70,),
                     tooltip: 'Bounced Products',
                     onPressed: () async {
@@ -634,7 +695,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                               ptr: items?.ptr,
                               amount: "0",
                               remark: items.remark,
-                              companyid: _selectedProduct?.dCompanyid,
+                              companyid: items.dCompanyid,
                               pid: items?.pid,
                               odid: 0,
                             ),
@@ -676,6 +737,15 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                       // Your onPressed action here
                     },
                   ),
+                  IconButton(
+                    icon: Icon(Icons.help,color: Colors.white70,),
+                    tooltip: 'Help',
+                    onPressed: () {
+                      setState(() {
+                        _showTutorial = true;
+                      });
+                    },
+                  ),
                 ],
               ),
 
@@ -684,184 +754,201 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                   child: Form(
                     key: _formKey,
                     child: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 1.0),
-                        child:
-                         Card(
-                            elevation: 10,
-                            color: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                            child: Padding(
-                              padding: EdgeInsets.all(15),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                      padding: EdgeInsets.symmetric(vertical: 1.0),
+                      child:
+                      Card(
+                        elevation: 10,
+                        color: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+                        child: Padding(
+                          padding: EdgeInsets.all(15),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
 
-                                      Card(
-                                        elevation: 10,
-                                        color: Colors.white, // Professional color
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(vertical: 16.0,horizontal: 16),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start
+                                  Card(
+                                    elevation: 10,
+                                    color: Colors.white, // Professional color
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 16.0,horizontal: 16),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start
+                                        children: [
+                                          _buildAnimatedDropdown<Customer>(
+                                            'Customer Name',
+                                            _selectedCustomer,
+                                            customerList,
+                                                (customer) => customer.name, // Extract customer name
+                                                (customer) => customer.id,    // Extract customer ID
+                                                (newValue) {
+                                              setState(() {
+                                                _selectedCustomer = newValue;
+                                                _selectedCustomerId = newValue?.id; // Store the selected ID
+                                                _selectGroupCode = newValue?.regCode;
+                                                print("check grp code ${_selectGroupCode}");
+                                              });
+                                            },
+                                          ),
+                                          SizedBox(height: 10), // Add spacing between elements
+
+                                          // Bottom Sheet for Retailer
+                                          GestureDetector(
+                                            key: retailerSelectorKey,
+                                            onTap: () => _showRetailerBottomSheet(context),
+                                            child: _buildBottomSheetTrigger(
+                                              'Retailer',
+                                              _selectedRetailer != null && _selectedRetailer!.partyname!.isNotEmpty
+                                                  ? _selectedRetailer!.partyname! // Display party name if selected
+                                                  : 'Select Retailer', // Default text when no retailer is selected
+                                            ),
+                                          ),
+                                          SizedBox(height: 10), // Add spacing between elements
+
+                                          // Bottom Sheet for Product
+                                          GestureDetector(
+                                            key: productSelectorKey,
+                                            onTap: () => _showProductBottomSheet(context),
+                                            child: _buildBottomSheetTrigger('Product Name', _selectedProduct?.pname ?? ''),
+                                          ),
+                                          SizedBox(height: 16),
+
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Center all children
                                             children: [
-                                              _buildAnimatedDropdown<Customer>(
-                                                'Customer Name',
-                                                _selectedCustomer,
-                                                customerList,
-                                                    (customer) => customer.name, // Extract customer name
-                                                    (customer) => customer.id,    // Extract customer ID
-                                                    (newValue) {
-                                                  setState(() {
-                                                    _selectedCustomer = newValue;
-                                                    _selectedCustomerId = newValue?.id; // Store the selected ID
-                                                    _selectGroupCode = newValue?.regCode;
-                                                    print("check grp code ${_selectGroupCode}");
-                                                  });
-                                                },
-                                              ),
-                                              SizedBox(height: 10), // Add spacing between elements
-
-                                              // Bottom Sheet for Retailer
-                                              GestureDetector(
-                                                onTap: () => _showRetailerBottomSheet(context),
-                                                child: _buildBottomSheetTrigger(
-                                                  'Retailer',
-                                                  _selectedRetailer != null && _selectedRetailer!.partyname!.isNotEmpty
-                                                      ? _selectedRetailer!.partyname! // Display party name if selected
-                                                      : 'Select Retailer', // Default text when no retailer is selected
-                                                ),
-                                              ),
-                                              SizedBox(height: 10), // Add spacing between elements
-
-                                              // Bottom Sheet for Product
-                                              GestureDetector(
-                                                onTap: () => _showProductBottomSheet(context),
-                                                child: _buildBottomSheetTrigger('Product Name', _selectedProduct?.pname ?? ''),
-                                              ),
-                                              SizedBox(height: 16),
-
-                                              Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween, // Center all children
-                                                children: [
-                                                  Expanded(
-                                                    flex: 2,
-                                                    child: Padding(
-                                                      padding: const EdgeInsets.all(8.0), // Added padding for better spacing
-                                                      child: Row(
-                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                              Expanded(
+                                                flex: 2,
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(8.0), // Added padding for better spacing
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                    children: [
+                                                      Text(
+                                                        'QTY',
+                                                        style: TextStyle(
+                                                          fontSize: 12.0,
+                                                          fontWeight: FontWeight.normal,
+                                                          color: Colors.black,
+                                                        ),
+                                                      ),
+                                                      Row(
+                                                        mainAxisSize: MainAxisSize.min,
                                                         children: [
-                                                          Text(
-                                                            'QTY',
-                                                            style: TextStyle(
-                                                              fontSize: 12.0,
-                                                              fontWeight: FontWeight.normal,
-                                                              color: Colors.black,
+                                                          IconButton(
+                                                            icon: Icon(Icons.remove, size: 16.0, color: Colors.red),
+                                                            onPressed: () {
+                                                              setState(() {
+                                                                _quantity = (_quantity - 1).clamp(0, 100);
+                                                                _quantityController.text = _quantity.toString();
+                                                              });
+                                                            },
+                                                          ),
+                                                          // Column for the TextField and its label
+                                                          SizedBox(
+                                                            width: 60,
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.center,
+                                                              children: [
+                                                                SizedBox(height: 4.0),
+                                                                Container(
+                                                                  decoration: BoxDecoration(
+                                                                    color: Colors.grey.shade200,
+                                                                    borderRadius: BorderRadius.circular(8),
+                                                                    border: Border.all(color: Colors.grey.shade400),
+                                                                  ),
+                                                                  child: TextField(
+                                                                    keyboardType: TextInputType.number,
+                                                                    textAlign: TextAlign.center,
+                                                                    style: TextStyle(fontSize: 16.0),
+                                                                    decoration: InputDecoration(
+                                                                      border: InputBorder.none,
+                                                                      hintText: '0',
+                                                                      hintStyle: TextStyle(color: Colors.grey.shade600),
+                                                                      contentPadding: EdgeInsets.symmetric(vertical: 12.0),
+                                                                    ),
+                                                                    controller: _quantityController,
+                                                                    onChanged: (value) {
+                                                                      final newValue = int.tryParse(value);
+                                                                      if (newValue != null && newValue >= 0 && newValue <= 100) {
+                                                                        setState(() {
+                                                                          _quantity = newValue;
+
+                                                                        });
+                                                                      }
+                                                                    },
+                                                                  ),
+                                                                ),
+                                                              ],
                                                             ),
                                                           ),
-                                                          Row(
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              IconButton(
-                                                                icon: Icon(Icons.remove, size: 16.0, color: Colors.red),
-                                                                onPressed: () {
-                                                                  setState(() {
-                                                                    _quantity = (_quantity - 1).clamp(0, 100);
-                                                                    _quantityController.text = _quantity.toString();
-                                                                  });
-                                                                },
-                                                              ),
-                                                              // Column for the TextField and its label
-                                                              SizedBox(
-                                                                width: 60,
-                                                                child: Column(
-                                                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                                                  children: [
-                                                                    SizedBox(height: 4.0),
-                                                                    Container(
-                                                                      decoration: BoxDecoration(
-                                                                        color: Colors.grey.shade200,
-                                                                        borderRadius: BorderRadius.circular(8),
-                                                                        border: Border.all(color: Colors.grey.shade400),
-                                                                      ),
-                                                                      child: TextField(
-                                                                        keyboardType: TextInputType.number,
-                                                                        textAlign: TextAlign.center,
-                                                                        style: TextStyle(fontSize: 16.0),
-                                                                        decoration: InputDecoration(
-                                                                          border: InputBorder.none,
-                                                                          hintText: '0',
-                                                                          hintStyle: TextStyle(color: Colors.grey.shade600),
-                                                                          contentPadding: EdgeInsets.symmetric(vertical: 12.0),
-                                                                        ),
-                                                                        controller: _quantityController,
-                                                                        onChanged: (value) {
-                                                                          final newValue = int.tryParse(value);
-                                                                          if (newValue != null && newValue >= 0 && newValue <= 100) {
-                                                                            setState(() {
-                                                                              _quantity = newValue;
-
-                                                                            });
-                                                                          }
-                                                                        },
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                              IconButton(
-                                                                icon: Icon(Icons.add, size: 16.0, color: Colors.green),
-                                                                onPressed: () {
-                                                                  setState(() {
-                                                                    _quantity = (_quantity + 1).clamp(0, 100);
-                                                                    _quantityController.text = _quantity.toString();
-                                                                  });
-                                                                },
-                                                              ),
-                                                            ],
+                                                          IconButton(
+                                                            icon: Icon(Icons.add, size: 16.0, color: Colors.green),
+                                                            onPressed: () {
+                                                              setState(() {
+                                                                _quantity = (_quantity + 1).clamp(0, 100);
+                                                                _quantityController.text = _quantity.toString();
+                                                              });
+                                                            },
                                                           ),
                                                         ],
                                                       ),
-                                                    ),
+                                                    ],
                                                   ),
-                                                  SizedBox(width: 10),
-                                                  Expanded(
-                                                    child: _buildAnimatedField(
-                                                      'Free',
-                                                      controller: TextEditingController(text: _freeQuantity),
-                                                      suffix: Icon(Icons.card_giftcard, color: Colors.orange),
-                                                    ),
-                                                  ),
-                                                ],
+                                                ),
                                               ),
+                                              SizedBox(width: 10),
+                                              Expanded(
+                                                child: _buildAnimatedField(
+                                                  'Free',
+                                                  controller: TextEditingController(text: _freeQuantity),
+                                                  suffix: Icon(Icons.card_giftcard, color: Colors.orange),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
 
-                                              SizedBox(height: 12), // Space before the Show More and Add button row
+                                          SizedBox(height: 12), // Space before the Show More and Add button row
 
-                                              // Row for Show More text and Add button
-                                              Row(
-                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                children: [
-                                                  GestureDetector(
-                                                    onTap: () {
-                                                      setState(() {
-                                                        _isExpanded = !_isExpanded; // Toggle expansion
-                                                      });
-                                                    },
-                                                    child: Text(
-                                                      _isExpanded ? 'Show Less' : 'Show More',
-                                                      style: TextStyle(
-                                                        fontSize: 13,
-                                                        color: Colors.blue.shade700, // Change color to indicate it's clickable
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                    ),
+                                          // Row for Show More text and Add button
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () {
+                                                  setState(() {
+                                                    _isExpanded = !_isExpanded; // Toggle expansion
+                                                  });
+                                                },
+                                                child: Text(
+                                                  _isExpanded ? 'Show Less' : 'Show More',
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    color: Colors.blue.shade700, // Change color to indicate it's clickable
+                                                    fontWeight: FontWeight.bold,
                                                   ),
-                                                  ElevatedButton(
-                                                    onPressed: () {
+                                                  key: showMoreKey,
+                                                ),
+                                              ),
+                                              Padding(padding: EdgeInsets.only(right: 10),
+                                                child: ElevatedButton(
+                                                  onPressed: () {
 
+                                                    if (_quantity == 0){
+
+                                                      Fluttertoast.showToast(
+                                                          msg: "Add Quantity...",
+                                                          toastLength: Toast.LENGTH_SHORT,
+                                                          gravity: ToastGravity.BOTTOM,
+                                                          timeInSecForIosWeb: 1,
+                                                          backgroundColor: Colors.red,
+                                                          textColor: Colors.white,
+                                                          fontSize: 16.0
+                                                      );
+
+                                                    }else{
                                                       List<int> d_companyId = [];
 
                                                       int selectedCompanyId = _selectedProduct!.dCompanyid!;
@@ -920,159 +1007,165 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                         print('After resetting quantities: $frequentlyList');
                                                       });
 
-                                                    },
-                                                    child: Text('Add', style: TextStyle(fontSize: 12, color: Colors.white)),
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: Colors.blue.shade700, // Change this color as per your theme
-                                                      padding: EdgeInsets.symmetric(vertical: 5.0, horizontal: 13.0),
-                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                                                    ),
+                                                    }
+
+
+                                                  },
+                                                  child: Text('Add', style: TextStyle(fontSize: 12, color: Colors.white),key: addButtonKey,),
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor: Colors.blue.shade700, // Change this color as per your theme
+                                                    padding: EdgeInsets.symmetric(vertical: 5.0, horizontal: 13.0),
+                                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
                                                   ),
-                                                ],
+                                                ),
                                               ),
 
-                                              // Expansion for MRP, PTR, Stock, Scheme in row format
-                                              if (_isExpanded)
-                                                Padding(
-                                                    padding: const EdgeInsets.only(top: 5.0),
-                                                    child: Container(
-                                                      margin: const EdgeInsets.symmetric( vertical: 2),
-                                                      child: _buildProductDetailsRow(),
-                                                    )
+                                            ],
+                                          ),
 
+                                          // Expansion for MRP, PTR, Stock, Scheme in row format
+                                          if (_isExpanded)
+                                            Padding(
+                                                padding: const EdgeInsets.only(top: 5.0),
+                                                child: Container(
+                                                  margin: const EdgeInsets.symmetric( vertical: 2),
+                                                  child: _buildProductDetailsRow(),
+                                                )
+
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  SizedBox(height: 5),
+                                  Card(
+                                    elevation: 10,
+                                    color: Colors.white, // Professional color
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16)),
+                                    child: Column(
+                                      children: [
+                                        TabBar(
+                                          controller: _tabController,
+                                          tabs: [
+
+                                            Tab(text: 'Delivery'),
+                                            Tab(text: 'Details'),
+                                          ],
+                                          labelColor: Colors.blue.shade700,
+                                          unselectedLabelColor: Colors.grey,
+                                          indicatorColor: Colors.blue.shade700,
+                                        ),
+                                        Container(
+                                          height: 320,
+                                          child: TabBarView(
+                                            controller: _tabController,
+                                            children: [
+
+                                              Padding(
+                                                padding: EdgeInsets.all(16),
+                                                child: Column(
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child:
+                                                          Container(
+                                                            decoration: BoxDecoration(
+                                                              color: Colors.white,
+                                                              borderRadius: BorderRadius.circular(12),
+                                                              boxShadow: [
+                                                                BoxShadow(
+                                                                  color: Colors.blue.withOpacity(0.1),
+                                                                  blurRadius: 8,
+                                                                  offset: Offset(0, 4),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            child: InkWell(
+                                                              onTap: () {
+                                                                // Handle the onPressed event here
+
+
+                                                                showInvoiceDetails(context, receivableList!);
+                                                                // Add any action you want here
+                                                              },
+                                                              child: Padding(
+                                                                padding: const EdgeInsets.all(12), // Add padding for better tap area
+                                                                child: Text(
+                                                                  key: osAmountKey,
+                                                                  selectOsAmt!.text.isNotEmpty ? 'OS Amount :- ${selectOsAmt?.text}' : 'OS Amount',
+                                                                  style: TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold), // You can customize the text style
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+
+                                                        ),
+                                                      ],
+                                                    ),
+
+                                                    SizedBox(height: 10,),
+                                                    _buildAnimatedDropdown<DeliveryOption>(
+                                                      'Delivery Option',
+                                                      _selectedDelivery,
+                                                      deliveryOptions,
+                                                          (product) => product.label,
+                                                          (product) => int.parse(product.value),
+                                                          (newValue) {
+                                                        setState(() {
+                                                          _selectedDelivery = newValue;
+                                                          _selectedDeliveryId =
+                                                              int.parse(newValue!.value);
+                                                        });
+                                                      },
+                                                    ),
+                                                    _buildAnimatedField('Remark',
+                                                        suffix: Icon(Icons.edit),controller: selectRemark),
+                                                  ],
                                                 ),
+                                              ),
+                                              Padding(
+                                                padding: EdgeInsets.all(16),
+                                                child: Column(
+                                                  children: [
+                                                    _buildAnimatedField('Address',
+                                                        readOnly: true,
+                                                        controller: selectAdd),
+                                                    Row(
+                                                      children: [
+                                                        Expanded(
+                                                            child: _buildAnimatedField('Area',
+                                                                readOnly: true,controller: selectArea)),
+                                                        SizedBox(width: 16),
+                                                        Expanded(
+                                                            child: _buildAnimatedField('City',
+                                                                readOnly: true,controller:selectCity)),
+                                                      ],
+                                                    ),
+                                                    _buildAnimatedField('Tel',
+                                                        readOnly: true,controller:selectTel),
+                                                    _buildAnimatedField('Mob',
+                                                        readOnly: true,controller: selectMob),
+                                                  ],
+                                                ),
+                                              ),
                                             ],
                                           ),
                                         ),
-                                      ),
-
-                                      SizedBox(height: 5),
-                                      Card(
-                                        elevation: 10,
-                                        color: Colors.white, // Professional color
-                                        shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(16)),
-                                        child: Column(
-                                          children: [
-                                            TabBar(
-                                              controller: _tabController,
-                                              tabs: [
-
-                                                Tab(text: 'Delivery'),
-                                                Tab(text: 'Details'),
-                                              ],
-                                              labelColor: Colors.blue.shade700,
-                                              unselectedLabelColor: Colors.grey,
-                                              indicatorColor: Colors.blue.shade700,
-                                            ),
-                                            Container(
-                                              height: 320,
-                                              child: TabBarView(
-                                                controller: _tabController,
-                                                children: [
-
-                                                  Padding(
-                                                    padding: EdgeInsets.all(16),
-                                                    child: Column(
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            Expanded(
-                                                              child:
-                                                              Container(
-                                                                decoration: BoxDecoration(
-                                                                  color: Colors.white,
-                                                                  borderRadius: BorderRadius.circular(12),
-                                                                  boxShadow: [
-                                                                    BoxShadow(
-                                                                      color: Colors.blue.withOpacity(0.1),
-                                                                      blurRadius: 8,
-                                                                      offset: Offset(0, 4),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                                child: InkWell(
-                                                                  onTap: () {
-                                                                    // Handle the onPressed event here
-
-
-                                                                    showInvoiceDetails(context, receivableList!);
-                                                                    // Add any action you want here
-                                                                  },
-                                                                  child: Padding(
-                                                                    padding: const EdgeInsets.all(12), // Add padding for better tap area
-                                                                    child: Text(
-                                                                      selectOsAmt!.text.isNotEmpty ? 'OS Amount :- ${selectOsAmt?.text}' : 'OS Amount',
-                                                                      style: TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold), // You can customize the text style
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ),
-
-                                                            ),
-                                                          ],
-                                                        ),
-
-                                                        SizedBox(height: 10,),
-                                                        _buildAnimatedDropdown<DeliveryOption>(
-                                                          'Delivery Option',
-                                                          _selectedDelivery,
-                                                          deliveryOptions,
-                                                              (product) => product.label,
-                                                              (product) => int.parse(product.value),
-                                                              (newValue) {
-                                                            setState(() {
-                                                              _selectedDelivery = newValue;
-                                                              _selectedDeliveryId =
-                                                                  int.parse(newValue!.value);
-                                                            });
-                                                          },
-                                                        ),
-                                                        _buildAnimatedField('Remark',
-                                                            suffix: Icon(Icons.edit),controller: selectRemark),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Padding(
-                                                    padding: EdgeInsets.all(16),
-                                                    child: Column(
-                                                      children: [
-                                                        _buildAnimatedField('Address',
-                                                            readOnly: true,
-                                                            controller: selectAdd),
-                                                        Row(
-                                                          children: [
-                                                            Expanded(
-                                                                child: _buildAnimatedField('Area',
-                                                                    readOnly: true,controller: selectArea)),
-                                                            SizedBox(width: 16),
-                                                            Expanded(
-                                                                child: _buildAnimatedField('City',
-                                                                    readOnly: true,controller:selectCity)),
-                                                          ],
-                                                        ),
-                                                        _buildAnimatedField('Tel',
-                                                            readOnly: true,controller:selectTel),
-                                                        _buildAnimatedField('Mob',
-                                                            readOnly: true,controller: selectMob),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-
-
-
-                                    ],
+                                      ],
+                                    ),
                                   ),
+
+
+
                                 ],
                               ),
-                            ),
+                            ],
                           ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -1081,6 +1174,133 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
           ),),
 
 
+      );
+    return _showTutorial
+        ? SalesOrderTutorial(
+      child: mainContent,
+      onComplete: () async {
+        print("Tutorial Completed"); // Debug print
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('show_sales_tutorial', false);
+        setState(() {
+          _showTutorial = false;
+        });
+      },
+      frequentlyPurchasedKey: frequentlyPurchasedKey,
+      bouncedProductsKey: bouncedProductsKey,
+      customerDropdownKey: customerDropdownKey,
+      retailerSelectorKey: retailerSelectorKey,
+      productSelectorKey: productSelectorKey,
+      showMoreKey: showMoreKey,
+      addButtonKey: addButtonKey,
+      osAmountKey: osAmountKey,
+
+    ) : mainContent;
+  }
+
+  // The delete confirmation sheet you provided
+  Future<bool?> showDeleteConfirmationSheet(BuildContext context) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Message Container
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            "Do you really want to continue?",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 0.5, color: Colors.grey),
+                    SizedBox(height: 0.5),
+                  ],
+                ),
+              ),
+
+              // Delete Button Container
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(true),
+                    borderRadius: BorderRadius.circular(13),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: const Text(
+                        "Yes, I'm sure",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Cancel Button Container
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(false),
+                    borderRadius: BorderRadius.circular(13),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF0A84FF),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -1725,18 +1945,30 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
 class ProductListWidget extends StatefulWidget {
   final List<ProductListItem> productListItem;
-  const ProductListWidget({Key? key, required this.productListItem}) : super(key: key);
+  final Function(List<ProductListItem>)? onProductListUpdated;
+
+  const ProductListWidget({
+    Key? key,
+    required this.productListItem,
+    this.onProductListUpdated,
+  }) : super(key: key);
+
   @override
   _ProductListWidgetState createState() => _ProductListWidgetState();
 }
+
 
 class _ProductListWidgetState extends State<ProductListWidget> {
   final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 2);
   late List<ProductList> products = [];
   bool _isLoading = false; // Loading state
   late TextEditingController _remarkController;
+  late TextEditingController _rateController;
+
   @override
   void initState() {
+    _rateController = TextEditingController(text: "0.0");
+    _remarkController = TextEditingController(text: "");
 
     updateProductsList();
 
@@ -1745,6 +1977,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
 
   @override
   void dispose() {
+    _rateController.dispose();
     _remarkController.dispose();
     super.dispose();
   }
@@ -1754,28 +1987,6 @@ class _ProductListWidgetState extends State<ProductListWidget> {
     super.didUpdateWidget(oldWidget);
     print("did anything chnagessss ${oldWidget.productListItem.length}");
     updateProductsList();
-  }
-
-  void removeProduct(ProductList product) {
-    setState(() {
-      // Remove from local products list
-      products.remove(product);
-
-      // Remove from source productListItem
-      for (var item in widget.productListItem) {
-        if (item.data != null) {
-          item.data!.removeWhere((p) =>
-          p.itemDetailid == product.itemDetailid &&
-              p.pid == product.pid
-          );
-        }
-      }
-
-      // Remove empty ProductListItems
-      widget.productListItem.removeWhere((item) =>
-      item.data == null || item.data!.isEmpty
-      );
-    });
   }
 
   void updateProductsList() {
@@ -1788,6 +1999,344 @@ class _ProductListWidgetState extends State<ProductListWidget> {
       }
     });
   }
+
+
+  Future<bool?> showDeleteConfirmationSheet(BuildContext context) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Message Container
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Product will be deleted',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 0.5, color: Colors.grey),
+                    SizedBox(height: 0.5),
+                  ],
+                ),
+              ),
+
+              // Delete Button Container
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(true),
+                    borderRadius: BorderRadius.circular(13),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: const Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Cancel Button Container
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(false),
+                    borderRadius: BorderRadius.circular(13),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF0A84FF),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+// Modified removeProduct function that handles the actual deletion
+  void removeProduct(ProductList product) {
+    setState(() {
+      // Remove from local products list
+      products.remove(product);
+
+      // Create a new list to hold updated items
+      List<ProductListItem> updatedList = [];
+
+      // Remove from source productListItem and build new list
+      for (var item in widget.productListItem) {
+        if (item.data != null) {
+          item.data!.removeWhere((p) =>
+          p.itemDetailid == product.itemDetailid &&
+              p.pid == product.pid
+          );
+
+          // Only add items that still have products
+          if (item.data!.isNotEmpty) {
+            updatedList.add(item);
+          }
+        }
+      }
+
+      // Notify parent widget of the update
+      widget.onProductListUpdated?.call(updatedList);
+    });
+  }
+
+  Widget _buildProductCard(ProductList product, int index) {
+    _rateController = TextEditingController(text: product.ptr ?? "");
+
+    _remarkController = TextEditingController(text: product.remark ?? "");
+    return Dismissible(
+      key: Key(product.hashCode.toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20.0),
+        color: Colors.red,
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        final bool? shouldDelete = await showDeleteConfirmationSheet(context);
+        if (shouldDelete == true) {
+          removeProduct(product);
+        }
+        return false; // Always return false so onDismissed is not called
+      },
+      onDismissed: (direction) {
+        removeProduct(product);
+      },
+      child: Card(
+        elevation: 2,
+        margin: EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              // Customizing the ExpansionTile icon
+              trailing: Icon(
+                Icons.arrow_circle_down_sharp, // Customize the icon
+                color: Colors.grey, // Change the color if needed
+                size: 18, // Adjust the size
+              ),
+              tilePadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              expandedAlignment: Alignment.centerLeft,
+              childrenPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            product.name!,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        _buildInfoChip(
+                          currencyFormat.format(product.total),
+                          Colors.purple,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              subtitle: Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute space evenly
+                  children: [
+                    Flexible(
+                      flex: 3,
+                      child: _buildInfoChip('MRP: ${product.mrp}', Colors.green),
+                    ),
+
+                    if (product.free! > 0) ...[
+                      Flexible(
+                        flex: 1,
+                        child: _buildInfoChip('Free: ${product.free}', Colors.orange),
+                      ),
+                      SizedBox(width: 12),
+                    ],
+                    Flexible(
+                      flex: 3,
+                      child: _buildInfoChip('PTR: ${product.ptr}', Colors.blueGrey),
+                    ),
+
+                    // Wrap the quantity control in an Expanded widget to allow it to take available space
+                    Expanded(
+                      flex: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                        child: _buildQuantityControl(product),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(left: 5,right: 5),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildEditableRate(
+                              'Rate',
+                              _rateController,
+                                  (newValue) {
+                                // Your logic to handle changes
+                                print('New Rate: $newValue');
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDetailItem(
+                              'Scheme',
+                              (product.scheme == null || product.scheme!.isEmpty) ? '--' : product.scheme!,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 300, // Set your desired width here
+                            height: 50, // Set your desired height here
+                            child: TextField(
+                              controller: _remarkController,
+                              decoration: InputDecoration(
+                                hintText: 'Add remark...',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(
+                                    color: Colors.blue, // Set your desired border color here
+                                    width: 1, // Set the border width if needed
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey, // Color when the TextField is focused
+                                    width: 1, // Optional: Different width when focused
+                                  ),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey[50],
+                              ),
+                              onChanged: (value) {
+                                setState(() {
+                                  product.remark = value;
+                                });
+                              },
+                              maxLines: 1,
+                            ),
+                          ),
+                          SizedBox(width: 10), // Space between the TextField and any following widget
+                        ],
+                      ),
+
+
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -1848,7 +2397,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // Draft logic
+                        _submitDraftOrder(widget.productListItem[0], products);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.grey.shade500, // Button color
@@ -1897,22 +2446,27 @@ class _ProductListWidgetState extends State<ProductListWidget> {
         ),
 
         // Loader Overlay
-        if (_isLoading)
+        if (_isLoading) ...[
           ModalBarrier(
             dismissible: false, // Prevent dismissing the overlay by tapping
             color: Colors.black54, // Optional: semi-transparent background color
           ),
-        if (_isLoading)
           Center(
-            child: LoadingIndicator(), // Show loader
+            child: Lottie.asset(
+              'assets/animations/order.json', // Path to your Lottie animation file
+              width: 200, // You can adjust the size as per your need
+              height: 200,
+              fit: BoxFit.fill,
+            ),
           ),
+        ],
       ],
     );
   }
 
 
   Future<void> _submitOrder(ProductListItem productItem, List<ProductList> product) async {
-    final url = Uri.parse(ApiConfig.reqCreateOrder()); // Replace with your actual API endpoint
+    final url = Uri.parse(ApiConfig.reqCreateOrder());
     final headers = {'Content-Type': 'application/json'};
 
     List<Orders> orders = [];
@@ -1936,7 +2490,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
 
     final orderModel = CreateOrderModel(
       data: orders,
-      remark: productItem.remark, // Add your remark here
+      remark: productItem.remark,
       grpCode: productItem.grpCode,
       ohid: productItem.ohid,
       companyId: productItem.companyId,
@@ -1944,7 +2498,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
       cusrid: productItem.cusrid,
       userType: productItem.userType,
       dType: productItem.dType,
-      orderStatus: 1, // For confirm
+      orderStatus: 1,
     );
 
     print("check the body ${orderModel.toJson()}");
@@ -1954,59 +2508,188 @@ class _ProductListWidgetState extends State<ProductListWidget> {
     });
 
     try {
-      // Make the POST request
       final response = await http.post(
         url,
         headers: headers,
         body: jsonEncode(orderModel),
       );
 
-      setState(() {
-        _isLoading = false; // Hide loader
-      });
+      // Ensure we are still mounted before modifying state
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Hide loader
+        });
 
-      if (response.statusCode == 201) {
-        // Handle success
-        final responseBody = jsonDecode(response.body);
-        print('Order submitted successfully: $responseBody');
-
-        // Show success Snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Order Created Successfully'),
-            backgroundColor: Colors.green, // Set the background color of the SnackBar
-          ),
-        );
+        if (response.statusCode == 201) {
+          final responseBody = jsonDecode(response.body);
+          print('Order submitted successfully: $responseBody');
 
 
-        // Navigate to another screen (replace 'AnotherScreen' with your target screen)
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => SalesOrderList()), // Replace with your target screen
-        );
-      } else {
-        // Handle failure
-        print('Failed to submit order: ${response.statusCode}');
-        print('Response: ${response.body}');
+          // Navigate to another screen
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => SalesOrderList()), // Your target screen
+                (Route<dynamic> route) => false, // This removes all previous routes
+          );
 
-        // Show failure Snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Something went wrong. Try again later.'),
-            backgroundColor: Colors.red,) // Set the background color of the SnackBar),
-        );
+        } else {
+          print('Failed to submit order: ${response.statusCode}');
+          print('Response: ${response.body}');
+
+          // Show failure message dialog
+          AwesomeDialog(
+            context: context,
+            animType: AnimType.topSlide,
+            headerAnimationLoop: true,
+            dialogType: DialogType.error,
+            showCloseIcon: false,
+            title: 'Failure',
+            desc: 'Something went wrong. Try again later.',
+            btnOkOnPress: () {
+              debugPrint('Dialog button clicked');
+            },
+            btnOkIcon: Icons.error,
+          ).show();
+        }
       }
     } catch (e) {
       // Handle any errors
-      setState(() {
-        _isLoading = false; // Hide loader
-      });
-      print('Error occurred while submitting order: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Hide loader
+        });
 
-      // Show error Snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Something went wrong. Try again later.'),
-          backgroundColor: Colors.red,) // Set the background color of the SnackBar),
+        print('Error occurred while submitting order: $e');
+
+        // Show error message dialog
+        AwesomeDialog(
+          context: context,
+          animType: AnimType.topSlide,
+          headerAnimationLoop: true,
+          dialogType: DialogType.error,
+          showCloseIcon: false,
+          title: 'Failure',
+          desc: 'Something went wrong. Try again later.',
+          btnOkOnPress: () {
+            debugPrint('Dialog button clicked');
+          },
+          btnOkIcon: Icons.error,
+        ).show();
+      }
+    }
+  }
+
+  Future<void> _submitDraftOrder(ProductListItem productItem, List<ProductList> product) async {
+    final url = Uri.parse(ApiConfig.reqCreateOrder());
+    final headers = {'Content-Type': 'application/json'};
+
+    List<Orders> orders = [];
+    for (var items in product) {
+      orders.add(Orders(
+        itemDetailid: items.itemDetailid!,
+        ledidParty: items.ledidParty!,
+        qty: items.qty,
+        free: items.free!,
+        schPercentage: 0,
+        rate: items.rate.toString(),
+        mrp: items.mrp.toString(),
+        ptr: items.ptr!,
+        amount: items.total.toString(),
+        remark: items.remark,
+        companyid: items.companyid,
+        pid: items.pid,
+        odid: items.odid,
+      ));
+    }
+
+    final orderModel = CreateOrderModel(
+      data: orders,
+      remark: productItem.remark,
+      grpCode: productItem.grpCode,
+      ohid: productItem.ohid,
+      companyId: productItem.companyId,
+      salesmanId: productItem.salesmanId,
+      cusrid: productItem.cusrid,
+      userType: productItem.userType,
+      dType: productItem.dType,
+      orderStatus: 0,
+    );
+
+    print("check the body ${orderModel.toJson()}");
+
+    setState(() {
+      _isLoading = true; // Show loader
+    });
+
+    try {
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(orderModel),
       );
+
+      // Ensure we are still mounted before modifying state
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Hide loader
+        });
+
+        if (response.statusCode == 201) {
+          final responseBody = jsonDecode(response.body);
+          print('Order submitted successfully: $responseBody');
+
+
+          // Navigate to another screen
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => DraftOrderList()), // Your target screen
+                (Route<dynamic> route) => false, // This removes all previous routes
+          );
+
+        } else {
+          print('Failed to submit order: ${response.statusCode}');
+          print('Response: ${response.body}');
+
+          // Show failure message dialog
+          AwesomeDialog(
+            context: context,
+            animType: AnimType.topSlide,
+            headerAnimationLoop: true,
+            dialogType: DialogType.error,
+            showCloseIcon: false,
+            title: 'Failure',
+            desc: 'Something went wrong. Try again later.',
+            btnOkOnPress: () {
+              debugPrint('Dialog button clicked');
+            },
+            btnOkIcon: Icons.error,
+          ).show();
+        }
+      }
+    } catch (e) {
+      // Handle any errors
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Hide loader
+        });
+
+        print('Error occurred while submitting order: $e');
+
+        // Show error message dialog
+        AwesomeDialog(
+          context: context,
+          animType: AnimType.topSlide,
+          headerAnimationLoop: true,
+          dialogType: DialogType.error,
+          showCloseIcon: false,
+          title: 'Failure',
+          desc: 'Something went wrong. Try again later.',
+          btnOkOnPress: () {
+            debugPrint('Dialog button clicked');
+          },
+          btnOkIcon: Icons.error,
+        ).show();
+      }
     }
   }
 
@@ -2042,177 +2725,8 @@ class _ProductListWidgetState extends State<ProductListWidget> {
     );
   }
 
-  Widget _buildProductCard(ProductList product, int index) {
-    _remarkController = TextEditingController(text: product.remark ?? "");
-    return Dismissible(
-      key: Key(product.hashCode.toString()),
-      direction: DismissDirection.endToStart,  // Only allow right to left swipe
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: EdgeInsets.only(right: 20.0),
-        color: Colors.red,
-        child: Icon(
-          Icons.delete,
-          color: Colors.white,
-        ),
-      ),
-      onDismissed: (direction) {
-        removeProduct(product); // Use the new removal method
-      },
-      child: Card(
-        elevation: 2,
-        margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: ExpansionTile(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '#${index + 1}',
-                          style: TextStyle(
-                            color: Colors.blue.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          product.name!,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        product.packing!,
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                    ],
-                  ),
-                ),
 
-              ],
-            ),
-            subtitle: Padding(
-              padding: EdgeInsets.symmetric(vertical: 2),
 
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  _buildInfoChip('MRP: ${product.mrp}', Colors.green),
-                  SizedBox(width: 12),
-                  if (product.free! > 0) ...[
-                    _buildInfoChip('Free: ${product.free}', Colors.orange),
-                    SizedBox(width: 12),
-                  ],
-                  _buildInfoChip(
-                    currencyFormat.format(product.total),
-                    Colors.purple,
-                  ),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: _buildQuantityControl(product),
-                  ),
-                ],
-              ),
-            ),
-            children: [
-              Padding(
-                padding: EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildEditableRate(
-                            'Rate',
-                            product.rate!,
-                                (newValue) {
-                              setState(() {
-                                // Update rate logic here
-                              });
-                            },
-                          ),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDetailItem('MRP', product.mrp!),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDetailItem('PTR',product.ptr!),
-                        ),
-                        SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDetailItem(
-                            'Scheme',
-                            (product.scheme == null || product.scheme!.isEmpty) ? '--' : product.scheme!,
-                          ),
-
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 140,
-                          height: 50,
-                          child: TextField(
-                            controller: _remarkController, // Set the controller
-                            decoration: InputDecoration(
-                              hintText: 'Add remark...',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                product.remark = value; // Update product remark on change
-                              });
-                            },
-                            maxLines: 1,
-                          ),
-                        ),
-                        SizedBox(width: 10),
-
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
   Widget _buildInfoChip(String label, Color color) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -2225,13 +2739,17 @@ class _ProductListWidgetState extends State<ProductListWidget> {
         style: TextStyle(
           color: color,
           fontWeight: FontWeight.bold,
-          fontSize: 13,
+          fontSize: 12,
         ),
       ),
     );
   }
 
-  Widget _buildEditableRate(String label, double value, Function(double) onChanged) {
+  Widget _buildEditableRate(
+      String label,
+      TextEditingController controller,
+      Function(double) onChanged,
+      ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2252,7 +2770,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
           padding: EdgeInsets.symmetric(horizontal: 8),
           child: TextField(
             keyboardType: TextInputType.numberWithOptions(decimal: true),
-            controller: TextEditingController(text: value.toString()),
+            controller: controller,
             decoration: InputDecoration(
               border: InputBorder.none,
               prefixText: '₹ ',
@@ -2268,6 +2786,8 @@ class _ProductListWidgetState extends State<ProductListWidget> {
                 onChanged(newRate);
               }
             },
+            // Adding a focus node to handle keyboard display
+            focusNode: FocusNode(),
           ),
         ),
       ],
@@ -2306,8 +2826,8 @@ class _ProductListWidgetState extends State<ProductListWidget> {
       constraints: BoxConstraints(
         minWidth: 120,
         maxWidth: 120,
-        minHeight: 36,
-        maxHeight: 36,
+        minHeight: 35,
+        maxHeight: 35,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2331,12 +2851,12 @@ class _ProductListWidgetState extends State<ProductListWidget> {
                 }
               },
               child: Container(
-                width: 36,
-                height: 36,
+                width: 30,
+                height: 30,
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.remove,
-                  size: 16,
+                  size: 15,
                   color: Colors.red,
                 ),
               ),
@@ -2390,12 +2910,12 @@ class _ProductListWidgetState extends State<ProductListWidget> {
                 });
               },
               child: Container(
-                width: 36,
-                height: 36,
+                width: 30,
+                height: 30,
                 alignment: Alignment.center,
                 child: Icon(
                   Icons.add,
-                  size: 16,
+                  size: 15,
                   color: Colors.green,
                 ),
               ),

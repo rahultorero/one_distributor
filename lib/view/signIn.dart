@@ -254,6 +254,8 @@ class _SignInState extends State<SignIn> with TickerProviderStateMixin {
             await prefs.setString('username', _emailController.text);
             await prefs.setString('password', _passwordController.text);
           }
+
+          await prefs.setString('user', loginResponse.data!.user.toString());
           await prefs.setString('division', loginResponse.data!.division.toString());
           await prefs.setString('reg_code', loginResponse.data!.uNo.toString());
           await prefs.setInt('u_id', loginResponse.data!.userId!);

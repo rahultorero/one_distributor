@@ -1,5 +1,6 @@
 import 'package:distributers_app/dataModels/FrequentlyPurchase.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 
@@ -23,13 +24,17 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
   final TextEditingController _searchController = TextEditingController();
   final currencyFormat = NumberFormat.currency(symbol: '₹', decimalDigits: 2);
   late List<FrequentlyItems> frequentlyList; // Store the invoice list here
-
+  List<FrequentlyItems> filteredList = [];
+  late TextEditingController _remarkController;
+  late TextEditingController _rateController;
 
 
   @override
   void initState() {
     super.initState();
     updateProductsList();
+    filteredList = frequentlyList; // Initialize filtered list with all products
+    _searchController.addListener(_filterProducts);
   }
 
   void updateProductsList() {
@@ -48,9 +53,29 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
 
   @override
   void dispose() {
+    _rateController.dispose();
+    _remarkController.dispose();
     _searchController.dispose();
     super.dispose();
   }
+  void _filterProducts() {
+    setState(() {
+      String query = _searchController.text.toLowerCase();
+
+      filteredList = frequentlyList.where((product) {
+        // Check if any of the fields match the search query
+        bool matchesName = product.pname != null && product.pname!.toLowerCase().contains(query);
+        bool matchesMRP = product.mrp != null && product.mrp.toString().toLowerCase().contains(query);
+        bool matchesPTR = product.ptr != null && product.ptr.toString().toLowerCase().contains(query);
+        bool matchesScheme = product.scheme != null && product.scheme!.toLowerCase().contains(query);
+
+        // Return true if any field matches the query
+        return matchesName || matchesMRP || matchesPTR || matchesScheme;
+      }).toList();
+    });
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -122,166 +147,195 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
     );
   }
 
+  // ListView that displays filtered products
   Widget _buildList() {
     return ListView.builder(
-      itemCount: frequentlyList.length,
+      itemCount: filteredList.length, // Use filtered list count
       padding: EdgeInsets.symmetric(horizontal: 5),
       itemBuilder: (context, index) {
-        return _buildProductCard(frequentlyList[index], index);
+        return _buildProductCard(filteredList[index], index);
       },
     );
   }
+
+
   Widget _buildProductCard(FrequentlyItems product, int index) {
+    _rateController = TextEditingController(text: product.ptr ?? "");
+    _remarkController = TextEditingController(text: product.remark ?? "");
+
+
     return Card(
       elevation: 2,
-      margin: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      margin: EdgeInsets.symmetric(horizontal: 5, vertical: 8),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.grey.shade200),
-          color: Colors.blue.shade50,  // Change this to the desired background color
         ),
-        child: ExpansionTile(
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: double.infinity,
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        '#${index + 1}',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontWeight: FontWeight.bold,
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            // Customizing the ExpansionTile icon
+            trailing: Icon(
+              Icons.arrow_circle_down_sharp, // Customize the icon
+              color: Colors.grey, // Change the color if needed
+              size: 18, // Adjust the size
+            ),
+            tilePadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+            expandedCrossAxisAlignment: CrossAxisAlignment.start,
+            expandedAlignment: Alignment.centerLeft,
+            childrenPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            color: Colors.blue.shade700,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
                       ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          product.pname! ?? "",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                      _buildInfoChip(
+                        currencyFormat.format(product.total),
+                        Colors.purple,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            subtitle: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Flexible(
+                    flex: 3,
+                    child: _buildInfoChip('MRP: ${product.mrp}', Colors.green),
+                  ),
+                  if (product.free! > 0) ...[
+                    Flexible(
+                      flex: 1,
+                      child: _buildInfoChip('Free: ${product.free}', Colors.orange),
                     ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        product.pname != null ?  product.pname! : '',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                    SizedBox(width: 12),
+                  ],
+                  Flexible(
+                    flex: 3,
+                    child: _buildInfoChip('PTR: ${product.ptr}', Colors.blueGrey),
+                  ),
+                  Expanded(
+                    flex: 3,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                      child: _buildQuantityControl(product),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            children: [
+              Padding(
+                padding: EdgeInsets.only(left: 5, right: 5),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildEditableRate(
+                            'Rate',
+                            _rateController,
+                                (newValue) {
+                              // Your logic to handle changes
+                              print('New Rate: $newValue');
+                            },
+                          ),
                         ),
-                      ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: _buildDetailItem(
+                            'Scheme',
+                            (product.scheme == null || product.scheme!.isEmpty) ? '--' : product.scheme!,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 300, // Set your desired width here
+                          height: 50, // Set your desired height here
+                          child: TextField(
+                            controller: _remarkController,
+                            decoration: InputDecoration(
+                              hintText: 'Add remark...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(
+                                  color: Colors.blue, // Set your desired border color here
+                                  width: 1, // Set the border width if needed
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(
+                                  color: Colors.grey, // Color when the TextField is focused
+                                  width: 1, // Optional: Different width when focused
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                product.remark = value;
+                              });
+                            },
+                            maxLines: 1,
+                          ),
+                        ),
+                        SizedBox(width: 10), // Space between the TextField and any following widget
+                      ],
                     ),
                   ],
                 ),
               ),
-              SizedBox(height: 4),
-              Text(
-                product.totalStock != null ? product.totalStock! : '',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 14,
-                ),
-              ),
             ],
           ),
-          subtitle: Padding(
-            padding: EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                _buildInfoChip('QTY: ${product.qty}', Colors.green),
-                SizedBox(width: 12),
-                if (product.free! > 0) ...[
-                  _buildInfoChip('Free: ${product.free}', Colors.orange),
-                  SizedBox(width: 12),
-                ],
-                _buildInfoChip(
-                  currencyFormat.format(product.total != null ? product.total : ''),
-                  Colors.purple,
-                ),
-              ],
-            ),
-          ),
-          children: [
-            Padding(
-              padding: EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildEditableRate(
-                          'Rate',
-                          product.rate,
-                              (newValue) {
-                            // Add logic for rate change
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: _buildDetailItem('MRP', product.mrp!),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDetailItem('PTR', product.ptr!),
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: _buildDetailItem(
-                          'Scheme',
-                          (product.scheme == null || product.scheme!.isEmpty) ? '--' : product.scheme!,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10),
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 180,
-                        height: 50,
-                        child: TextField(
-                          decoration: InputDecoration(
-                            hintText: 'Add remark...',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              product.remark = value;
-                            });
-                          },
-                          maxLines: 1,
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: _buildQuantityControl(product),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 
+
   Widget _buildInfoChip(String label, Color color) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal:10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(4),
@@ -297,7 +351,11 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
     );
   }
 
-  Widget _buildEditableRate(String label, double value, Function(double) onChanged) {
+  Widget _buildEditableRate(
+      String label,
+      TextEditingController controller,
+      Function(double) onChanged,
+      ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -318,7 +376,7 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
           padding: EdgeInsets.symmetric(horizontal: 8),
           child: TextField(
             keyboardType: TextInputType.numberWithOptions(decimal: true),
-            controller: TextEditingController(text: value.toString()),
+            controller: controller,
             decoration: InputDecoration(
               border: InputBorder.none,
               prefixText: '₹ ',
@@ -334,6 +392,8 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
                 onChanged(newRate);
               }
             },
+            // Adding a focus node to handle keyboard display
+            focusNode: FocusNode(),
           ),
         ),
       ],
@@ -365,50 +425,107 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
   }
 
   Widget _buildQuantityControl(FrequentlyItems product) {
+    // Create a stateful text editing controller
+    final TextEditingController _controller = TextEditingController(text: product.qty?.toString() ?? '0');
+
     return Container(
-      width: 30, // Set a fixed width for the entire quantity control (optional)
+      constraints: BoxConstraints(
+        minWidth: 120,
+        maxWidth: 120,
+        minHeight: 35,
+        maxHeight: 35,
+      ),
       decoration: BoxDecoration(
+        color: Colors.white,
         border: Border.all(color: Colors.grey.shade300),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min, // Ensures the Row doesn't expand unnecessarily
+        mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: Icon(Icons.remove, size: 16),
-            onPressed: () {
-              setState(() {
-                if (product.qty! > 0) product.qty--;
-              });
-            },
-            color: Colors.red,
-          ),
-          // Set specific width for the TextField
-          SizedBox(
-            width: 30, // Adjust the width of the quantity input field
-            child: TextField(
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.zero,
-              ),
-              controller: TextEditingController(text: product.qty.toString()),
-              onChanged: (value) {
-                setState(() {
-                  product.qty = int.tryParse(value) ?? 0;
-                });
+          // Decrease button
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.horizontal(left: Radius.circular(7)),
+              onTap: () {
+                if (product.qty != null && product.qty! > 0) {
+                  setState(() {
+                    product.qty = product.qty! - 1;
+                    _controller.text = product.qty.toString();
+                  });
+                }
               },
+              child: Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.remove,
+                  size: 15,
+                  color: Colors.red,
+                ),
+              ),
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.add, size: 16),
-            onPressed: () {
-              setState(() {
-                product.qty++;
-              });
-            },
-            color: Colors.green,
+
+          // Quantity input
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.symmetric(
+                  vertical: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: TextField(
+                controller: _controller,
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                style: TextStyle(fontSize: 14),
+                decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
+                  border: InputBorder.none,
+                  counterText: '',
+                ),
+                maxLength: 4,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    product.qty = int.tryParse(value) ?? 0;
+                  });
+                },
+              ),
+            ),
+          ),
+
+          // Increase button
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.horizontal(right: Radius.circular(7)),
+              onTap: () {
+                setState(() {
+                  product.qty = (product.qty ?? 0) + 1;
+                  _controller.text = product.qty.toString();
+                });
+              },
+              child: Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.add,
+                  size: 15,
+                  color: Colors.green,
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -423,7 +540,7 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
           final frequentlySelectedList = frequentlyList.where((item) => item.qty > 0).toList();
 
           // Debug: Print the filtered list before popping
-          print('Filtered frequentlySelectedList: $frequentlySelectedList');
+          print('Filtered frequentlySelectedList: ${frequentlySelectedList}');
 
           // Use Future.delayed to ensure the pop happens before resetting
           Navigator.pop(context, frequentlySelectedList);

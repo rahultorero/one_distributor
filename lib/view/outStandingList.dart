@@ -40,6 +40,7 @@ class _OutStandingListState extends State<OutStandingList> {
   String? _selectedStore;
   String userSearch = "";
 
+
   DateTimeRange? _selectedDateRange;
   @override
   void initState() {
@@ -206,14 +207,12 @@ class _OutStandingListState extends State<OutStandingList> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-
             _buildActionButtons(),
-            // Use Visibility to conditionally render filter fields
             Visibility(
               visible: _isDropdownVisible || _isSearchVisible || _isDateRangeVisible,
               child: _buildFilterFields(),
             ),
-            SizedBox(height: _isDropdownVisible || _isSearchVisible || _isDateRangeVisible ? 8 : 4),
+            SizedBox(height: _isDropdownVisible || _isSearchVisible || _isDateRangeVisible ? 4 : 2),
             Expanded(
               child: filteredOrders.isEmpty
                   ? Center(child: LoadingIndicator())
@@ -223,66 +222,54 @@ class _OutStandingListState extends State<OutStandingList> {
                   final order = filteredOrders[index];
                   return InkWell(
                     onTap: () {
-
-
-
+                      _showOrderDetailsBottomSheet(context, order.receivableData);
                     },
-                    child: Card(
-                      color: Colors.white,
-                      elevation: 4,
-                      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Container(
-                                      width:260,
-                                      child: Text(
-                                        "${order.partyName}",
-                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                    child: Container(
+                      margin: EdgeInsets.symmetric(horizontal: 4, vertical: 2), // Reduced margin
+                      child: Card(
+                        color: Colors.white,
+                        elevation: 2, // Reduced elevation
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8), // Slightly rounded corners
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0), // Reduced padding
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      order.partyName,
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600), // Slightly smaller font
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-
-                                    Container(
-                                      width: 50,
-                                      child: Text(
-                                        " (${order.partyCode})",
-                                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                _buildInfoRow(Icons.location_on, 'Area/City:', '${order.area ?? ''}, ${order.city ?? ''}'),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                                Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: Text(
-                                    'Amt: ₹${order.totalBalance ?? '0.00'}',
-                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.teal),
                                   ),
-
-                            ),
-                          ],
+                                  SizedBox(width: 2),
+                                  Text(
+                                    "(${order.partyCode})",
+                                    style: TextStyle(fontSize: 14, color: Colors.black54), // Smaller font
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4), // Reduced spacing
+                              _buildInfoRow(Icons.location_on, 'Location:', '${order.area ?? ''}, ${order.city ?? ''}'),
+                              _buildInfoRow(Icons.phone, 'Phone:', order.mobile ?? 'N/A'),
+                              _buildInfoRow(Icons.email, 'Email:', order.email ?? 'N/A'),
+                              const SizedBox(height: 6), // Space before amount
+                              Divider(color: Colors.grey, thickness: 0.5), // Subtle divider
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  'Amt: ₹${order.totalBalance?.toStringAsFixed(2) ?? '0.00'}',
+                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.teal), // Smaller amount font
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -295,6 +282,374 @@ class _OutStandingListState extends State<OutStandingList> {
       ),
     );
   }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2), // Compact spacing
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Colors.teal), // Slightly smaller icon
+          SizedBox(width: 4), // Adjusted spacing
+          Expanded(
+            child: Text(
+              '$label $value',
+              style: TextStyle(fontSize: 13), // Smaller font size for compactness
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOrderDetailsBottomSheet(BuildContext context, List<ReceivableData> orders) {
+    double previousAmount = 0.0;
+    DateTime? _startDate;
+    DateTime? _endDate;
+
+    // Function to filter orders by date range
+    List<ReceivableData> _filterOrdersByDate(List<ReceivableData> orders,
+        DateTime? startDate, DateTime? endDate) {
+      if (startDate == null || endDate == null) return orders;
+      return orders.where((order) {
+        DateTime orderDate = order
+            .invDate; // Adjust this if `invDate` is a string
+        return orderDate.isAfter(startDate.subtract(Duration(days: 1))) &&
+            orderDate.isBefore(endDate.add(Duration(days: 1)));
+      }).toList();
+    }
+
+    // Function to show date range picker
+    Future<void> _selectDateRange(BuildContext context) async {
+      final DateTimeRange? picked = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(2000), // Earliest possible date
+        lastDate: DateTime(2100), // Latest possible date
+        initialDateRange: _startDate != null && _endDate != null
+            ? DateTimeRange(start: _startDate!, end: _endDate!)
+            : null,
+      );
+
+      if (picked != null) {
+        _startDate = picked.start;
+        _endDate = picked.end;
+      }
+    }
+
+    // Function to clear the selected date range
+    void _clearDateRange() {
+      _startDate = null;
+      _endDate = null;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            // Apply date filter to the orders
+            List<ReceivableData> filteredOrders = _filterOrdersByDate(
+                orders, _startDate, _endDate);
+            previousAmount = 0.0; // Reset previousAmount for filtered orders
+
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.6,
+              minChildSize: 0.4,
+              maxChildSize: 0.9,
+              builder: (context, scrollController) {
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header with Exit Icon
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Order Details',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.teal[800],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close, color: Colors.redAccent),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ],
+                        ),
+                        Divider(color: Colors.grey[400], thickness: 1.0),
+                        const SizedBox(height: 10),
+
+                        // Date Range Picker Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Date Range Picker Button
+                            ElevatedButton(
+                              onPressed: () async {
+                                await _selectDateRange(context);
+                                setState(() {}); // Refresh UI to apply date filter
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.teal[700],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                _startDate != null && _endDate != null
+                                    ? '${formatDateTime(
+                                    _startDate!)} - ${formatDateTime(
+                                    _endDate!)}'
+                                    : 'Select Date Range',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+
+                            // Clear Date Button
+                            if (_startDate != null || _endDate != null)
+                              ElevatedButton(
+                                onPressed: () {
+                                  _clearDateRange();
+                                  setState(() {}); // Refresh UI to clear date filter
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.redAccent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Clear',
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          itemCount: filteredOrders.length,
+                          itemBuilder: (context, index) {
+                            final order = filteredOrders[index];
+                            previousAmount += order.invAmt;
+                            return Container(
+                              margin: EdgeInsets.symmetric(vertical: 8),
+                              child: Card(
+                                color: Colors.grey[50],
+                                // Light background for the card
+                                elevation: 3,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12.0),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment
+                                        .start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .spaceBetween,
+                                        children: [
+                                          Text(
+                                            'Code: ${order.prefix}/${order
+                                                .invNo}',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.blueGrey[800],
+                                            ),
+                                          ),
+                                          Text(
+                                            'Total: ₹${previousAmount
+                                                .toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                              color: Colors.teal[800],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Divider(color: Colors.grey[300],
+                                          thickness: 0.7),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .spaceBetween,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment
+                                                .start,
+                                            children: [
+                                              Text(
+                                                'Date:',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                '${formatDateTime(order
+                                                    .invDate)} - ${formatDateTime(
+                                                    order.dueDate)}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey[900],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment
+                                                .end,
+                                            children: [
+                                              Text(
+                                                'INV Amount:',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                '₹${order.invAmt
+                                                    .toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey[900],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+
+                                      // Additional Information Below the First Row
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .spaceBetween,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment
+                                                .start,
+                                            children: [
+                                              Text(
+                                                'Salesman:',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                '${order.salesman}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey[900],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment
+                                                .end,
+                                            children: [
+                                              Text(
+                                                'CN Amt:',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                '₹${order.cnAmt.toStringAsFixed(
+                                                    2)}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey[900],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+
+                                      // RECD Amt Information
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .spaceBetween,
+                                        children: [
+                                          Spacer(),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment
+                                                .end,
+                                            children: [
+                                              Text(
+                                                'RECD Amt:',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              Text(
+                                                '₹${order.recdAmt
+                                                    .toStringAsFixed(2)}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Colors.grey[900],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String formatDateTime(DateTime dateTime) {
+    // Format: YYYY-MM-DD
+    return '${dateTime.year.toString().padLeft(4, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.day.toString().padLeft(2, '0')}';
+  }
+
+
 
   List<Map<String, dynamic>> deliveryOptions = [
     {"label": "DELIVERY", "value": "1691"},
@@ -523,25 +878,6 @@ class _OutStandingListState extends State<OutStandingList> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.teal), // Icon for visual cue
-          SizedBox(width: 8), // Spacing between icon and text
-          Container(
-            width: 150,
-            child: Text(
-              value,
-              style: TextStyle(fontSize: 13),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildInfoRow2(IconData icon, String label, String value) {
     return Padding(
