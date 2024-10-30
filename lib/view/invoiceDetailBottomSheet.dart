@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 class InvoiceDetailSheet extends StatefulWidget {
   final ReceivableListRes receivable;
 
+
   const InvoiceDetailSheet({
     Key? key,
     required this.receivable,
@@ -18,14 +19,13 @@ class InvoiceDetailSheet extends StatefulWidget {
 
 class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
   late List<Receivable> receivableList; // Store the invoice list here
-  double previousAmount =  0.0 ;
+  final ValueNotifier<double> cumulativeBalanceNotifier = ValueNotifier(0.0);
+
+
   @override
   void initState() {
     super.initState();
     updateProductsList();
-
-
-
   }
 
 
@@ -43,7 +43,19 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
           receivableList.add(item);
         }
       }
+      _updateRunningBalance();
     });
+  }
+
+  void _updateRunningBalance() {
+    double runningTotal = 0.0;
+    // Sort the list by date if needed
+    for (var receivable in receivableList) {
+      if (receivable.balance != null) {
+        runningTotal += double.parse(receivable.balance!);
+      }
+    }
+    cumulativeBalanceNotifier.value = runningTotal;
   }
 
   Widget _buildPairedInfo(String leftLabel, String leftValue, String rightLabel, String rightValue) {
@@ -102,8 +114,14 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
     );
   }
 
-  Widget _buildAmountSection(Receivable receivable) {
-    previousAmount += double.parse(receivable.balance!) ;
+  Widget _buildAmountSection(Receivable receivable, int index) {
+    double runningBalance = 0.0;
+    for (int i = 0; i <= index; i++) {
+      if (receivableList[i].balance != null) {
+        runningBalance += double.parse(receivableList[i].balance!);
+      }
+    }
+    // Remove the accumulation from here
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
@@ -178,7 +196,7 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
                     Flexible(
                       flex: 2,
                       child: Text(
-                        '₹${receivable.balance}', // Show the balance value
+                        '₹${receivable.balance}',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -203,7 +221,7 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
                     Flexible(
                       flex: 2,
                       child: Text(
-                        '₹${previousAmount}', // Show sum of balance and previousBalance
+                        '₹${runningBalance.toStringAsFixed(2)}',
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -217,10 +235,17 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
               ),
             ],
           )
-
         ],
       ),
     );
+  }
+
+  void updateCumulativeBalance(List<Receivable> receivables) {
+    double total = 0.0;
+    for (var receivable in receivables) {
+      total += double.parse(receivable.balance!);
+    }
+    cumulativeBalanceNotifier.value = total;
   }
 
   String formatDateFromString(String? dateString) {
@@ -233,7 +258,7 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
     }
   }
 
-  Widget _buildInvoiceItem(Receivable receivable) {
+  Widget _buildInvoiceItem(Receivable receivable, int index) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       padding: const EdgeInsets.all(12),
@@ -251,7 +276,7 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
           const SizedBox(height: 6),
           _buildPairedInfo('PM', receivable.pm!, 'Salesman', receivable.sman!),
           const Divider(height: 16),
-          _buildAmountSection(receivable),
+          _buildAmountSection(receivable,index),
         ],
       ),
     );
@@ -348,7 +373,7 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               itemCount: receivableList.length,
-              itemBuilder: (context, index) => _buildInvoiceItem(receivableList[index]),
+              itemBuilder: (context, index) => _buildInvoiceItem(receivableList[index],index),
             ),
           ),
           _buildTotalSection(),
@@ -357,6 +382,7 @@ class _InvoiceDetailSheetState extends State<InvoiceDetailSheet> {
     );
   }
 }
+
 void showInvoiceDetails(BuildContext context, ReceivableListRes invoices) {
   showModalBottomSheet(
     context: context,

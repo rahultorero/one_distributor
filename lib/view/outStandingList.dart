@@ -39,7 +39,7 @@ class _OutStandingListState extends State<OutStandingList> {
   // Dummy data for the dropdown
   String? _selectedStore;
   String userSearch = "";
-
+  late double runningBalance ;
 
   DateTimeRange? _selectedDateRange;
   @override
@@ -292,7 +292,7 @@ class _OutStandingListState extends State<OutStandingList> {
           SizedBox(width: 4), // Adjusted spacing
           Expanded(
             child: Text(
-              '$label $value',
+              '$value',
               style: TextStyle(fontSize: 13), // Smaller font size for compactness
               overflow: TextOverflow.ellipsis,
             ),
@@ -352,10 +352,17 @@ class _OutStandingListState extends State<OutStandingList> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
-            // Apply date filter to the orders
+            // Filter the orders based on the date range
             List<ReceivableData> filteredOrders = _filterOrdersByDate(
                 orders, _startDate, _endDate);
-            previousAmount = 0.0; // Reset previousAmount for filtered orders
+
+            // Calculate running balances for all items once
+            List<double> runningBalances = [];
+            double tempBalance = 0.0;
+            for (var order in filteredOrders) {
+              tempBalance += order.balance;
+              runningBalances.add(tempBalance);
+            }
 
             return DraggableScrollableSheet(
               expand: false,
@@ -365,275 +372,91 @@ class _OutStandingListState extends State<OutStandingList> {
               builder: (context, scrollController) {
                 return Padding(
                   padding: const EdgeInsets.all(16.0),
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Header with Exit Icon
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Order Details',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.teal[800],
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Header with Exit Icon
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Order Details',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.teal[800],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close, color: Colors.redAccent),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ],
+                      ),
+                      Divider(color: Colors.grey[400], thickness: 1.0),
+                      const SizedBox(height: 10),
+
+                      // Date Range Picker Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () async {
+                              await _selectDateRange(context);
+                              setState(() {}); // Refresh UI to apply date filter
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal[700],
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                            IconButton(
-                              icon: Icon(Icons.close, color: Colors.redAccent),
-                              onPressed: () => Navigator.of(context).pop(),
+                            child: Text(
+                              _startDate != null && _endDate != null
+                                  ? '${formatDateTime(_startDate!)} - ${formatDateTime(_endDate!)}'
+                                  : 'Select Date Range',
+                              style: TextStyle(color: Colors.white),
                             ),
-                          ],
-                        ),
-                        Divider(color: Colors.grey[400], thickness: 1.0),
-                        const SizedBox(height: 10),
+                          ),
 
-                        // Date Range Picker Row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Date Range Picker Button
+                          if (_startDate != null || _endDate != null)
                             ElevatedButton(
-                              onPressed: () async {
-                                await _selectDateRange(context);
-                                setState(() {}); // Refresh UI to apply date filter
+                              onPressed: () {
+                                _clearDateRange();
+                                setState(() {}); // Refresh UI to clear date filter
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.teal[700],
+                                backgroundColor: Colors.redAccent,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                               child: Text(
-                                _startDate != null && _endDate != null
-                                    ? '${formatDateTime(
-                                    _startDate!)} - ${formatDateTime(
-                                    _endDate!)}'
-                                    : 'Select Date Range',
+                                'Clear',
                                 style: TextStyle(color: Colors.white),
                               ),
                             ),
+                        ],
+                      ),
 
-                            // Clear Date Button
-                            if (_startDate != null || _endDate != null)
-                              ElevatedButton(
-                                onPressed: () {
-                                  _clearDateRange();
-                                  setState(() {}); // Refresh UI to clear date filter
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.redAccent,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Clear',
-                                  style: TextStyle(color: Colors.white),
-                                ),
-                              ),
-                          ],
-                        ),
+                      const SizedBox(height: 10),
 
-                        const SizedBox(height: 10),
-
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
+                      // Expanded ListView with Invoices
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollController,
                           itemCount: filteredOrders.length,
-                          itemBuilder: (context, index) {
-                            final order = filteredOrders[index];
-                            previousAmount += order.invAmt;
-                            return Container(
-                              margin: EdgeInsets.symmetric(vertical: 8),
-                              child: Card(
-                                color: Colors.grey[50],
-                                // Light background for the card
-                                elevation: 3,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment
-                                        .start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .spaceBetween,
-                                        children: [
-                                          Text(
-                                            'Code: ${order.prefix}/${order
-                                                .invNo}',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.blueGrey[800],
-                                            ),
-                                          ),
-                                          Text(
-                                            'Total: ₹${previousAmount
-                                                .toStringAsFixed(2)}',
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                              color: Colors.teal[800],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Divider(color: Colors.grey[300],
-                                          thickness: 0.7),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .spaceBetween,
-                                        children: [
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment
-                                                .start,
-                                            children: [
-                                              Text(
-                                                'Date:',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[700],
-                                                ),
-                                              ),
-                                              Text(
-                                                '${formatDateTime(order
-                                                    .invDate)} - ${formatDateTime(
-                                                    order.dueDate)}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey[900],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment
-                                                .end,
-                                            children: [
-                                              Text(
-                                                'INV Amount:',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[700],
-                                                ),
-                                              ),
-                                              Text(
-                                                '₹${order.invAmt
-                                                    .toStringAsFixed(2)}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey[900],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-
-                                      // Additional Information Below the First Row
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .spaceBetween,
-                                        children: [
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment
-                                                .start,
-                                            children: [
-                                              Text(
-                                                'Salesman:',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[700],
-                                                ),
-                                              ),
-                                              Text(
-                                                '${order.salesman}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey[900],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment
-                                                .end,
-                                            children: [
-                                              Text(
-                                                'CN Amt:',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[700],
-                                                ),
-                                              ),
-                                              Text(
-                                                '₹${order.cnAmt.toStringAsFixed(
-                                                    2)}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey[900],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-
-                                      // RECD Amt Information
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment
-                                            .spaceBetween,
-                                        children: [
-                                          Spacer(),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment
-                                                .end,
-                                            children: [
-                                              Text(
-                                                'RECD Amt:',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[700],
-                                                ),
-                                              ),
-                                              Text(
-                                                '₹${order.recdAmt
-                                                    .toStringAsFixed(2)}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                  color: Colors.grey[900],
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
+                          itemBuilder: (context, index) => _buildInvoiceItem(
+                              filteredOrders[index],
+                              index,
+                              runningBalances[index]  // Pass pre-calculated running balance
+                          ),
                         ),
-                      ],
-                    ),
+                      ),
+
+                      // Fixed Total Section at Bottom
+                      _buildTotalSection(filteredOrders),
+                    ],
                   ),
                 );
               },
@@ -642,6 +465,8 @@ class _OutStandingListState extends State<OutStandingList> {
         );
       },
     );
+
+
   }
 
   String formatDateTime(DateTime dateTime) {
@@ -649,6 +474,271 @@ class _OutStandingListState extends State<OutStandingList> {
     return '${dateTime.year.toString().padLeft(4, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.day.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildInvoiceItem(ReceivableData receivable, int index, double runningBalance) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildPairedInfo('TYPE', receivable.invType!, 'INV NO', receivable.invNo!.toString()),
+          const SizedBox(height: 6),
+          _buildPairedInfo('INV DATE', formatDateTime(receivable.invDate!), 'DUE DATE', formatDateTime(receivable.dueDate!)),
+          const SizedBox(height: 6),
+          _buildPairedInfo('PM', receivable.paymentMethod!, 'SMAN', receivable.salesman!),
+          const Divider(height: 16),
+          _buildAmountSection(receivable, index, runningBalance),  // Pass the pre-calculated running balance
+        ],
+      ),
+    );
+  }
+  Widget _buildPairedInfo(String leftLabel, String leftValue, String rightLabel, String rightValue) {
+    return Row(
+      children: [
+        // Left side with flexible content
+        Expanded(
+          child: Row(
+            children: [
+              Text(
+                '$leftLabel: ',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  leftValue,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8), // Add some spacing between pairs
+        // Right side with flexible content
+        Expanded(
+          child: Row(
+            children: [
+              Text(
+                '$rightLabel: ',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  rightValue,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAmountSection(ReceivableData receivable, int index,double runningBalance) {
+
+
+    // Remove the accumulation from here
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      flex: 3,
+                      child: Text(
+                        'INV AMT: ',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                    Flexible(
+                      flex: 2,
+                      child: Text(
+                        '₹${receivable.invAmt}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      flex: 3,
+                      child: Text(
+                        'ADJ AMT: ',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                    Flexible(
+                      flex: 2,
+                      child: Text(
+                        '₹${receivable.recdAmt+receivable.cnAmt}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'BAL: ',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                    Flexible(
+                      flex: 2,
+                      child: Text(
+                        '₹${receivable.balance}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'C.BAL: ',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ),
+                    Flexible(
+                      flex: 2,
+                      child: Text(
+                        '₹${runningBalance.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTotalSection(List<ReceivableData> receivable) {
+
+
+    double totalInvAmount = receivable.fold(0, (sum, invoice) => sum + double.parse(invoice.invAmt.toString()));
+    double totalBalance = receivable.fold(0, (sum, invoice) => sum + double.parse(invoice.balance.toString()));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.blue[50],
+        border: Border(top: BorderSide(color: Colors.grey[300]!)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                const Text(
+                  'Total Inv: ',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                Flexible(
+                  child: Text(
+                    '₹${totalInvAmount.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text(
+                  'Balance: ',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                Flexible(
+                  child: Text(
+                    '₹${totalBalance.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
 
   List<Map<String, dynamic>> deliveryOptions = [

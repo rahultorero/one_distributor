@@ -210,7 +210,7 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          product.pname! ?? "",
+                          product.pname ?? "",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -264,26 +264,49 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
                 child: Column(
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
-                          child: _buildEditableRate(
-                            'Rate',
-                            _rateController,
-                                (newValue) {
-                              // Your logic to handle changes
-                              print('New Rate: $newValue');
-                            },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildEditableRate(
+                                'Rate',
+                                _rateController,
+                                    (newValue) {
+                                  // Your logic to handle changes
+                                  print('New Rate: $newValue');
+                                },
+                              ),
+                            ],
                           ),
                         ),
                         SizedBox(width: 16),
                         Expanded(
-                          child: _buildDetailItem(
-                            'Scheme',
-                            (product.scheme == null || product.scheme!.isEmpty) ? '--' : product.scheme!,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildDetailItem(
+                                'Stock',
+                                (product.stock == null || product.stock!.isEmpty) ? '--' : product.stock!,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildDetailItem(
+                                'Scheme',
+                                (product.scheme == null || product.scheme!.isEmpty) ? '--' : product.scheme!,
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
+
                     SizedBox(height: 10),
                     Row(
                       children: [
@@ -418,6 +441,7 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
+            overflow: TextOverflow.ellipsis
           ),
         ),
       ],

@@ -45,6 +45,7 @@ class FrequentlyItems {
   int qty = 0;
   int free = 0;
   String? remark;
+  String? stock;
   double get total => qty! * rate!;
 
   FrequentlyItems(
@@ -60,6 +61,7 @@ class FrequentlyItems {
         this.pcode,
         this.dCompanyid,
         this.ptr,
+        this.stock,
         this.mrp});
 
   FrequentlyItems.fromJson(Map<String, dynamic> json) {

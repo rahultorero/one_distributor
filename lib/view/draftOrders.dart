@@ -6,6 +6,7 @@ import 'package:distributers_app/view/profileScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -58,6 +59,9 @@ class _DraftOrderListState extends State<DraftOrderList> {
   }
 
   Future<void> fetchData() async {
+    setState(() {
+      isLoading = true; // Assuming you have an isLoading boolean variable
+    });
     await _fetchDivisionAndCompanies(); // Call the first function and wait for it to complete
     await fetchOrderList(); // Then call the second function
   }
@@ -74,10 +78,6 @@ class _DraftOrderListState extends State<DraftOrderList> {
     } catch (e) {
       // Handle any errors that occur during fetching
       print('Error fetching data: $e');
-    } finally {
-      setState(() {
-        isLoading = false; // Update loading state
-      });
     }
   }
 
@@ -131,9 +131,7 @@ class _DraftOrderListState extends State<DraftOrderList> {
     };
 
     // Set a loading state
-    setState(() {
-      isLoading = true; // Assuming you have an isLoading boolean variable
-    });
+
 
     print(body);
 
@@ -236,8 +234,22 @@ class _DraftOrderListState extends State<DraftOrderList> {
             ),
             SizedBox(height: _isDropdownVisible || _isSearchVisible || _isDateRangeVisible ? 8 : 4),
             Expanded(
-              child: filteredOrders.isEmpty
-                  ? Center(child: LoadingIndicator())
+              child:isLoading ?
+              Center(child: LoadingIndicator(),)
+                  :
+              filteredOrders.isEmpty
+                  ? Center(
+                child: Container(
+                  color: Colors.transparent, // Make the background transparent
+                  child: Lottie.asset(
+                    'assets/animations/empty_state2.json', // Path to your Lottie animation file
+                    width: 200, // Adjust the size as per your need
+                    height: 200,
+                    fit: BoxFit.fill,
+                  ),
+                ),
+
+              )
                   : ListView.builder(
                 itemCount: filteredOrders.length,
                 itemBuilder: (context, index) {

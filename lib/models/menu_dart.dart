@@ -70,7 +70,21 @@ class MenuItemModel {
       title: "Product Mapping",
       assetPath: 'assets/images/product_icon.svg',
       iconType: IconType.asset,
-      route: '/product_mapping', // Add route
+      route: '/product_mapping',
+      children: [ // Add child items for Order
+        MenuItemModel(
+          title: "Product Map",
+          assetPath: 'assets/images/product_icon.svg',
+          iconType: IconType.asset,
+          route: '/product_map',
+        ),
+        MenuItemModel(
+          title: "Mapped Product",
+          assetPath: 'assets/images/product_icon.svg',
+          iconType: IconType.asset,
+          route: '/map_product',
+        ),
+      ],// Add route
     ),
     MenuItemModel(
       title: "Upload Data",
@@ -103,7 +117,7 @@ class MenuItemModel {
       title: "Logout",
       flutterIcon: Icons.logout,
       iconType: IconType.flutterIcon,
-      route: '/logout', // Optional route for logout
+      route: '/logout',  // This is crucial
     ),
   ];
 }

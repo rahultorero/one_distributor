@@ -5,6 +5,7 @@ import 'package:distributers_app/view/profileScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -46,6 +47,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
   bool _isSearchVisible = false;
   bool _isDateRangeVisible = false;
   String? regCode;
+  String? selectReCode;
   List<Store> stores = [];
   String? selectedRegCode;
   String? selectedCompanyName;
@@ -76,6 +78,10 @@ class _SalesOrderListState extends State<SalesOrderList> {
   }
 
   Future<void> fetchData() async {
+    setState(() {
+      isLoading = true; // Assuming you have an isLoading boolean variable
+    });
+
     await _fetchDivisionAndCompanies(); // Call the first function and wait for it to complete
     await fetchOrderList(); // Then call the second function
   }
@@ -88,14 +94,11 @@ class _SalesOrderListState extends State<SalesOrderList> {
         // Fetch companies using the division value
         stores = await fetchCompanies(regCode!);
         selectedCompanyId = stores[0].companyId;
+        selectedRegCode = stores[0].regCode;
       }
     } catch (e) {
       // Handle any errors that occur during fetching
       print('Error fetching data: $e');
-    } finally {
-      setState(() {
-        isLoading = false; // Update loading state
-      });
     }
   }
 
@@ -143,14 +146,11 @@ class _SalesOrderListState extends State<SalesOrderList> {
     final Map<String, dynamic> body = {
       'companyid': selectedCompanyId,
       'from': formattedStartDate ?? formatDate(today), // Use yesterday if null
-      'reg_code': regCode?.substring(0, 7),
+      'reg_code': selectedRegCode,
       'to': formattedEndDate ?? formatDate(today), // Use today if null
     };
 
     // Set a loading state
-    setState(() {
-      isLoading = true; // Assuming you have an isLoading boolean variable
-    });
 
     print(body);
 
@@ -255,8 +255,20 @@ class _SalesOrderListState extends State<SalesOrderList> {
             ),
             SizedBox(height: _isDropdownVisible || _isSearchVisible || _isDateRangeVisible ? 8 : 4),
             Expanded(
-              child: filteredOrders.isEmpty
-                  ? Center(child: LoadingIndicator())
+              child: isLoading ?
+                  Center(child: LoadingIndicator(),)
+              :
+              filteredOrders.isEmpty
+                  ? Center(
+                child: Container(
+                  child: Lottie.asset(
+                    'assets/animations/empty_state2.json', // Path to your Lottie animation file
+                    width: 200, // You can adjust the size as per your need
+                    height: 200,
+                    fit: BoxFit.fill,
+                  ),
+                ),
+              )
                   : ListView.builder(
                 itemCount: filteredOrders.length,
                 itemBuilder: (context, index) {
@@ -265,7 +277,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
                     onTap: () {
                       _showOrderDetails(context, order);
                     },
-                    child: Card(
+                    child:  Card(
                       color: Colors.white,
                       elevation: 4,
                       margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -284,7 +296,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Container(
-                                      width: 130,
+                                      width: 160,
                                       child: Text(
                                         "${order.partyName}",
                                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -302,12 +314,72 @@ class _SalesOrderListState extends State<SalesOrderList> {
                                   ],
                                 ),
                                 Container(
-                                  padding: const EdgeInsets.only(left: 10.0), // Add right padding here
+                                  padding: const EdgeInsets.only(left: 10.0),
                                   width: 100,
                                   child: Text(
                                     "${order.orderNo}",
                                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                                     overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            // Status indicators in a new row
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: getStatusColor(order.billStatus).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        getStatusIcon(order.billStatus),
+                                        size: 14,
+                                        color: getStatusColor(order.billStatus),
+                                      ),
+                                      SizedBox(width: 2),
+                                      Text(
+                                        order.billStatus ?? 'N/A',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: getStatusColor(order.billStatus),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: getUploadStatusColor(order.uploaded).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        getUploadStatusIcon(order.uploaded),
+                                        size: 14,
+                                        color: getUploadStatusColor(order.uploaded),
+                                      ),
+                                      SizedBox(width: 2),
+                                      Text(
+                                        order.uploaded ?? 'N/A',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: getUploadStatusColor(order.uploaded),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -331,7 +403,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
                               children: [
                                 _buildInfoRow(Icons.add_business_outlined, 'Company Name', '${order.companyName ?? ''}'),
                                 Spacer(),
-                                _buildInfoRow2(Icons.comment_outlined, 'Created By:', '${order.oreMark ?? ''}'),
+                                _buildInfoRow2(Icons.comment_outlined, 'Remarks:', '${order.oreMark ?? ''}'),
                               ],
                             ),
                             const SizedBox(height: 10),
@@ -365,6 +437,123 @@ class _SalesOrderListState extends State<SalesOrderList> {
         ),
       ),
     );
+  }
+  Color getStatusColor(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'CHKED':  // Checked
+        return Colors.blue;
+      case 'GDWIN':  // Goods In
+        return Colors.green;
+      case 'GDWOT':  // Goods Out
+        return Colors.teal;
+      case 'NOPRINT': // Not Printed
+        return Colors.grey;
+      case 'DCONF':  // Delivery Confirmed
+        return Colors.green;
+      case 'DELIV':  // Delivered
+        return Colors.green;
+      case 'PACKD':  // Packed
+        return Colors.blue;
+      case 'PRNCF':  // Print Confirmed
+        return Colors.blue;
+      case 'PENDING':
+        return Colors.orange;
+      case 'PRINTED':
+        return Colors.blue;
+      case 'UPLOADED':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData getStatusIcon(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'CHKED':
+        return Icons.fact_check;
+      case 'GDWIN':
+        return Icons.inbox;
+      case 'GDWOT':
+        return Icons.outbox;
+      case 'NOPRINT':
+        return Icons.print_disabled;
+      case 'DCONF':
+        return Icons.local_shipping;
+      case 'DELIV':
+        return Icons.done_all;
+      case 'PACKD':
+        return Icons.inventory_2;
+      case 'PRNCF':
+        return Icons.print_outlined;
+      case 'PENDING':
+        return Icons.pending;
+      case 'PRINTED':
+        return Icons.print;
+      case 'UPLOADED':
+        return Icons.cloud_done;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  Color getUploadStatusColor(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'UPLOADED':
+        return Colors.green;
+      case 'PENDING':
+        return Colors.orange;
+      case 'NOPRINT': // Not Printed
+      case 'NOT UPLOADED':
+        return Colors.grey;
+      case 'FAILED':
+        return Colors.red;
+      case 'PRINTED':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData getUploadStatusIcon(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'UPLOADED':
+        return Icons.cloud_done;
+      case 'PENDING':
+        return Icons.cloud_upload;
+      case 'NOPRINT':
+      case 'NOT UPLOADED':
+        return Icons.cloud_off;
+      case 'FAILED':
+        return Icons.error_outline;
+      case 'PRINTED':
+        return Icons.print_outlined;
+      default:
+        return Icons.cloud_upload;
+    }
+  }
+
+// Optional: Helper function to get readable status text
+  String getReadableStatus(String? status) {
+    switch (status?.toUpperCase()) {
+      case 'CHKED':
+        return 'Checked';
+      case 'GDWIN':
+        return 'Goods In';
+      case 'GDWOT':
+        return 'Goods Out';
+      case 'NOPRINT':
+        return 'Not Printed';
+      case 'DCONF':
+        return 'Delivery Confirmed';
+      case 'DELIV':
+        return 'Delivered';
+      case 'PACKD':
+        return 'Packed';
+      case 'PRNCF':
+        return 'Print Confirmed';
+      default:
+        return status ?? 'N/A';
+    }
   }
 
   List<Map<String, dynamic>> deliveryOptions = [
@@ -544,6 +733,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
                     selectedRegCode = selectedStore.regCode; // Store regCode
                     selectedCompanyName = selectedStore.companyName; // Store companyName
                     selectedCompanyId = selectedStore.companyId; // Store companyId
+                    selectedRegCode = selectedStore.regCode;
                   });
                 }
               },
@@ -678,7 +868,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => OrderBottomSheet(ocId: order.ohid,orderId: order.orderNo,companyName: order.companyName,),
+      builder: (context) => OrderBottomSheet(ocId: order.ohid,orderId: order.orderNo,companyName: order.partyName,),
     );
   }
 
@@ -780,7 +970,7 @@ class _OrderBottomSheetState extends State<OrderBottomSheet> {
 
               Expanded(
                 child: orderDetails == null
-                    ? Center(child: CircularProgressIndicator()) // Show loading indicator
+                    ? Center(child: LoadingIndicator()) // Show loading indicator
                     : ListView.builder(
                   controller: controller,
                   padding: EdgeInsets.all(10),
@@ -835,9 +1025,10 @@ class _OrderBottomSheetState extends State<OrderBottomSheet> {
                                     VerticalDivider(color: Colors.grey[300], thickness: 1),
                                     _buildInfoColumn('Rate', order.rate.toString()),
                                     VerticalDivider(color: Colors.grey[300], thickness: 1),
-                                    _buildInfoColumn('Amt', order.amount.toString()),
-                                    VerticalDivider(color: Colors.grey[300], thickness: 1),
                                     _buildInfoColumn('Mrp', order.mrp.toString()),
+                                    VerticalDivider(color: Colors.grey[300], thickness: 1),
+                                    _buildInfoColumn('Amt', order.amount.toString()),
+
 
                                   ],
                                 ),

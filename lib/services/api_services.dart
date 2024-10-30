@@ -29,6 +29,12 @@ class ApiConfig {
   static const String getFrequently = "/dist_freq_prod";
   static const String getBounced = "/sale_loss";
   static const String createOrder = "/create_order";
+  static const String getMappedProduct = "/matching_product";
+  static const String getUnMappedProduct = "/get_unmatched_product";
+  static const String MappedProduct = "/mapping_product";
+
+
+
 
 
   static String getHeader(){
@@ -130,5 +136,17 @@ class ApiConfig {
 
   static String reqCreateOrder(){
     return '$baseUrl$createOrder';
+  }
+
+  static String reqMapProduct(){
+    return '$baseUrl$getMappedProduct';
+  }
+
+  static String reqUnMapProduct(){
+    return '$baseUrl$getUnMappedProduct';
+  }
+
+  static String postMapProduct(){
+    return '$baseUrl$MappedProduct';
   }
 }

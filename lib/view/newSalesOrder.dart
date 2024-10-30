@@ -68,6 +68,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   late PartyProductModel product;
   int? _selectedCustomerId;
   String? _selectGroupCode;
+  int? _selectedCompanyId;
   TextEditingController? selectAdd;
   TextEditingController? selectArea;
   TextEditingController? selectCity;
@@ -76,7 +77,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   TextEditingController? selectOsAmt;
   TextEditingController? selectRemark;
   TextEditingController _remarkController = TextEditingController();
-
+  late FocusNode searchFocusNode;
+  late TextEditingController searchController;
   int? _selectedDeliveryId;
   final TextEditingController _quantityController = TextEditingController();
   List<ProductListItem> productListItem = [];
@@ -105,7 +107,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   @override
   void initState() {
     super.initState();
-
+    searchFocusNode = FocusNode();
+    searchController = TextEditingController();
     print("NewSalesOrder State Initialized"); // Debug print
     _checkTutorialStatus(); // Add this method to check if tutorial should be shown
 
@@ -147,6 +150,15 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     _tabController = TabController(length: 2, vsync: this);
     fetchData();
 
+    selectRemark?.addListener((){
+      if(productListItem.isNotEmpty){
+        setState(() {
+          productListItem.first.remark = selectRemark?.text;
+        });
+      }
+
+    });
+
   }
 
   @override
@@ -161,6 +173,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     selectRemark?.dispose();
     _quantityController.dispose();
     _remarkController.dispose();
+    searchFocusNode.dispose();
+    searchController.dispose();
     super.dispose();
   }
 
@@ -178,7 +192,13 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   }
 
   Future<void> fetchData() async {
+    setState(() {
+      isLoading = true; // Show loader
+    });
     await _fetchDivisionAndCompanies(); // Call the first function and wait for it to complete
+    print("check salesIdd ${smid}");
+    print("check salesIdd ${_selectedCustomerId}");
+    print("check salesIdd ${regCode}");
     product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: "false",regCode: regCode!,smanId: smid!))!; // Then call the second function
 
     for (var store in product.data!) {
@@ -207,6 +227,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
         // Set selected company ID to the first one in the list
         _selectedCustomerId = stores[0].companyId;
         _selectGroupCode = stores[0].regCode;
+        _selectedCompanyId = stores[0].companyId;
 
         // Optionally, set the default selected customer
         _selectedCustomer = customerList.isNotEmpty ? customerList[0] : null;
@@ -215,10 +236,6 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     } catch (e) {
       // Handle any errors that occur during fetching
       print('Error fetching data: $e');
-    } finally {
-      setState(() {
-        isLoading = false; // Update loading state
-      });
     }
   }
 
@@ -278,7 +295,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       if (response.statusCode == 200) {
         // Decode the response as a map
         final Map<String, dynamic> data = jsonDecode(response.body);
-        print(response.body); // Log the response for debugging
+        print("check the receivable ${response.body}"); // Log the response for debugging
 
         // Parse the response into a ReceivableListRes object
         ReceivableListRes receivableListRes = ReceivableListRes.fromJson(data);
@@ -388,11 +405,9 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     return prefs.getInt("u_id"); // Replace with your key
   }
 
-  Future<PartyProductModel?> fetchPartyProductData(
-      {required int companyId,
-        required String isWeekly,
-        required String regCode,
-        required int smanId}) async {
+  Future<PartyProductModel?> fetchPartyProductData({required int companyId, required String isWeekly, required String regCode, required int smanId}) async {
+
+
     final String apiUrl = ApiConfig.reqPartyProduct();; // Replace with your API URL
 
     // Define the request body
@@ -402,6 +417,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       'reg_code': regCode,
       'smanid': smanId,
     };
+
+    print("checl party body ${requestBody}");
 
     try {
       // Make the POST request
@@ -415,7 +432,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       if (response.statusCode == 200) {
         // Parse the response body into your model class
         final Map<String, dynamic> responseData = json.decode(response.body);
-        print("party Product list ${responseData.toString()}");
+        debugPrint("party Product list ${responseData.toString()}");
         return PartyProductModel.fromJson(responseData);
       } else {
         print("Failed to load data. Status Code: ${response.statusCode}");
@@ -424,6 +441,10 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     } catch (e) {
       print("Error fetching data: $e");
       return null;
+    }finally {
+      setState(() {
+        isLoading = false; // Hide loader
+      });
     }
   }
 
@@ -465,6 +486,69 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       ),
     );
   }
+
+  Widget _buildAnimatedFieldFree(
+      String label, {
+        bool readOnly = false,
+        String? initialValue,
+        Widget? suffix,
+        TextEditingController? controller,
+      }) {
+    return GestureDetector(
+      onTap: () {
+        if (_selectedProduct == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please select product first...'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+      child: AbsorbPointer(
+        absorbing: _selectedProduct == null, // Makes field unclickable if null
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 300),
+          margin: EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: readOnly ? Colors.grey.shade100 : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.1),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: TextFormField(
+            initialValue: initialValue,
+            keyboardType: TextInputType.number,
+            controller: controller,
+            readOnly: readOnly,
+            style: TextStyle(
+              fontSize: 14.0,
+            ),
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: TextStyle(
+                fontSize: 14.0,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.transparent,
+              suffixIcon: suffix,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
 
 
   Widget _buildAnimatedDropdown<T>(
@@ -542,7 +626,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     Widget mainContent =
       Scaffold(
         backgroundColor: Colors.grey.shade200, // Subtle background color
-        body:
+        body: isLoading
+            ? Center(child: LoadingIndicator()):
         SlidingProductPanel(productListItem: productListItem,
           child: CustomScrollView(
             slivers: [
@@ -623,6 +708,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                               remark: items.remark,
                               companyid: items.dCompanyid,
                               pid: items?.pid,
+                              stock: items.totalStock,
                               odid: 0,
                             ),
                           ];
@@ -697,6 +783,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                               remark: items.remark,
                               companyid: items.dCompanyid,
                               pid: items?.pid,
+                              stock: items.totalStock,
                               odid: 0,
                             ),
                           ];
@@ -789,7 +876,9 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                 _selectedCustomer = newValue;
                                                 _selectedCustomerId = newValue?.id; // Store the selected ID
                                                 _selectGroupCode = newValue?.regCode;
+                                                _selectedCompanyId = newValue?.id;
                                                 print("check grp code ${_selectGroupCode}");
+                                                fetchApi();
                                               });
                                             },
                                           ),
@@ -840,10 +929,21 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                           IconButton(
                                                             icon: Icon(Icons.remove, size: 16.0, color: Colors.red),
                                                             onPressed: () {
-                                                              setState(() {
-                                                                _quantity = (_quantity - 1).clamp(0, 100);
-                                                                _quantityController.text = _quantity.toString();
-                                                              });
+                                                              if(_selectedProduct != null ){
+                                                                setState(() {
+                                                                  _quantity = (_quantity - 1).clamp(0, 100);
+                                                                  _quantityController.text = _quantity.toString();
+                                                                });
+                                                              }else{
+                                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                                  SnackBar(
+                                                                    content: Text('Please select product first...'),
+                                                                    backgroundColor: Colors.red, // Optional: Customize the color
+                                                                    duration: Duration(seconds: 2), // Duration for the SnackBar
+                                                                  ),
+                                                                );
+                                                              }
+
                                                             },
                                                           ),
                                                           // Column for the TextField and its label
@@ -887,10 +987,21 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                           IconButton(
                                                             icon: Icon(Icons.add, size: 16.0, color: Colors.green),
                                                             onPressed: () {
-                                                              setState(() {
-                                                                _quantity = (_quantity + 1).clamp(0, 100);
-                                                                _quantityController.text = _quantity.toString();
-                                                              });
+                                                              if(_selectedProduct != null ){
+                                                                setState(() {
+                                                                  _quantity = (_quantity + 1).clamp(0, 100);
+                                                                  _quantityController.text = _quantity.toString();
+                                                                });
+                                                              }else{
+                                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                                  SnackBar(
+                                                                    content: Text('Please select product first...'),
+                                                                    backgroundColor: Colors.red, // Optional: Customize the color
+                                                                    duration: Duration(seconds: 2), // Duration for the SnackBar
+                                                                  ),
+                                                                );
+                                                              }
+
                                                             },
                                                           ),
                                                         ],
@@ -901,7 +1012,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                               ),
                                               SizedBox(width: 10),
                                               Expanded(
-                                                child: _buildAnimatedField(
+                                                child: _buildAnimatedFieldFree(
                                                   'Free',
                                                   controller: TextEditingController(text: _freeQuantity),
                                                   suffix: Icon(Icons.card_giftcard, color: Colors.orange),
@@ -916,7 +1027,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              GestureDetector(
+                                              _selectedProduct != null
+                                                  ? GestureDetector(
                                                 onTap: () {
                                                   setState(() {
                                                     _isExpanded = !_isExpanded; // Toggle expansion
@@ -931,24 +1043,14 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                   ),
                                                   key: showMoreKey,
                                                 ),
-                                              ),
+                                              )
+                                                  : SizedBox.shrink(),
+
                                               Padding(padding: EdgeInsets.only(right: 10),
                                                 child: ElevatedButton(
                                                   onPressed: () {
 
-                                                    if (_quantity == 0){
 
-                                                      Fluttertoast.showToast(
-                                                          msg: "Add Quantity...",
-                                                          toastLength: Toast.LENGTH_SHORT,
-                                                          gravity: ToastGravity.BOTTOM,
-                                                          timeInSecForIosWeb: 1,
-                                                          backgroundColor: Colors.red,
-                                                          textColor: Colors.white,
-                                                          fontSize: 16.0
-                                                      );
-
-                                                    }else{
                                                       List<int> d_companyId = [];
 
                                                       int selectedCompanyId = _selectedProduct!.dCompanyid!;
@@ -975,6 +1077,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                           companyid: _selectedProduct?.dCompanyid,
                                                           pid: _selectedProduct?.pid,
                                                           odid: 0,
+                                                          stock: _selectedProduct?.totalStock!
                                                         ),
 
                                                       ];
@@ -1006,9 +1109,6 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                         // Debug: Print the list after resetting quantities
                                                         print('After resetting quantities: $frequentlyList');
                                                       });
-
-                                                    }
-
 
                                                   },
                                                   child: Text('Add', style: TextStyle(fontSize: 12, color: Colors.white),key: addButtonKey,),
@@ -1086,18 +1186,38 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                             child: InkWell(
                                                               onTap: () {
                                                                 // Handle the onPressed event here
+                                                                print("Check outstanding: ${jsonEncode(receivableList)}");
 
+                                                                if(receivableList!.data!.isEmpty){
+                                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                                    SnackBar(
+                                                                      content: Text('OutStanding Not Found'),
+                                                                      backgroundColor: Colors.red, // Optional: Customize the color
+                                                                      duration: Duration(seconds: 2), // Duration for the SnackBar
+                                                                    ),
+                                                                  );
+                                                                }else{
+                                                                  showInvoiceDetails(context, receivableList!);
+                                                                }
 
-                                                                showInvoiceDetails(context, receivableList!);
                                                                 // Add any action you want here
                                                               },
                                                               child: Padding(
                                                                 padding: const EdgeInsets.all(12), // Add padding for better tap area
                                                                 child: Text(
                                                                   key: osAmountKey,
-                                                                  selectOsAmt!.text.isNotEmpty ? 'OS Amount :- ${selectOsAmt?.text}' : 'OS Amount',
-                                                                  style: TextStyle(color: Colors.black,fontSize: 15,fontWeight: FontWeight.bold), // You can customize the text style
+                                                                  selectOsAmt!.text.isNotEmpty && selectOsAmt!.text != '0'
+                                                                      ? 'OS Amount: ₹${selectOsAmt!.text}'
+                                                                      : 'OS Amount',
+                                                                  style: TextStyle(
+                                                                    color: (selectOsAmt!.text.isNotEmpty && selectOsAmt!.text != '0')
+                                                                        ? Colors.green
+                                                                        : Colors.black,
+                                                                    fontSize: 15,
+                                                                    fontWeight: FontWeight.bold,
+                                                                  ),
                                                                 ),
+
                                                               ),
                                                             ),
                                                           ),
@@ -1118,6 +1238,9 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                           _selectedDelivery = newValue;
                                                           _selectedDeliveryId =
                                                               int.parse(newValue!.value);
+                                                          if(productListItem.isNotEmpty){
+                                                            productListItem.first.dType = int.parse(newValue!.value);
+                                                          }
                                                         });
                                                       },
                                                     ),
@@ -1175,7 +1298,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
 
       );
-    return _showTutorial
+    return
+    _showTutorial
         ? SalesOrderTutorial(
       child: mainContent,
       onComplete: () async {
@@ -1197,6 +1321,19 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
     ) : mainContent;
   }
+
+  Future<void> fetchApi()async {
+    product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: "false",regCode: regCode!,smanId: smid!))!; // Then call the second function
+
+    for(var product in product.data!){
+      setState(() {
+        retailerList = product.party!;
+        productList = product.product!;
+      });
+    }
+
+  }
+
 
   // The delete confirmation sheet you provided
   Future<bool?> showDeleteConfirmationSheet(BuildContext context) {
@@ -1303,6 +1440,112 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       },
     );
   }
+
+  Future<bool?> showAddConfirmationSheet(BuildContext context) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (BuildContext context) {
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Message Container
+              Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16.0),
+                      child: Column(
+                        children: [
+                          Text(
+                            "This product is already added!",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 0.5, color: Colors.grey),
+                    SizedBox(height: 0.5),
+                  ],
+                ),
+              ),
+
+              // Delete Button Container
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(true),
+                    borderRadius: BorderRadius.circular(13),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: const Text(
+                        "Yes, I'm sure",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Cancel Button Container
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1C1C1E),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(false),
+                    borderRadius: BorderRadius.circular(13),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: const Text(
+                        'Remove',
+                        style: TextStyle(
+                          color: Color(0xFF0A84FF),
+                          fontSize: 17,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
 
   Widget _buildProductDetailsRow() {
     const TextStyle labelStyle = TextStyle(
@@ -1426,12 +1669,28 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   }
 
 
-  void addProduct(ProductListItem orderItem) {
-    setState(() {
-      productListItem.add(orderItem);
+  void addProduct(ProductListItem orderItem) async {
+    // Check if the item already exists in the list
+    final existingIndex = productListItem.indexWhere((item) => item.data?[0].pid == orderItem.data?[0].pid);
 
-    });
+    // If it exists, show confirmation sheet
+    if (existingIndex != -1) {
+      final shouldOverride = await showAddConfirmationSheet(context);
+      print("check the bool ${shouldOverride}");
+      if (shouldOverride == true) {
+        // Override the existing item
+        setState(() {
+          productListItem[existingIndex] = orderItem;
+        });
+      }
+    } else {
+      // If item doesn't exist, add it directly
+      setState(() {
+        productListItem.add(orderItem);
+      });
+    }
   }
+
 
 
   void _showRetailerBottomSheet(BuildContext context) {
@@ -1548,7 +1807,6 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       },
     );
   }
-
 
   void _showProductBottomSheet(BuildContext context) {
     final searchController = TextEditingController();
@@ -1717,17 +1975,30 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   }
 
   Widget _buildProductCard(Product product, String searchQuery, BuildContext context) {
+    Color cardColor;
+
+    // Ensure product.totalStock is treated as an integer for comparison
+    int stock = int.tryParse(product.totalStock?.toString() ?? '0') ?? 0;
+
+    // Determine card color based on stock and scheme availability
+    if (stock > 0 && (product.scheme ?? '').isNotEmpty) {
+      cardColor = Colors.lightBlue.shade100; // Light blue if both stock and scheme are available
+    } else if (stock > 0) {
+      cardColor = Colors.lightGreen.shade100; // Light green if only stock is available
+    } else {
+      cardColor = Colors.red.shade100; // Light red if stock is not available
+    }
+
     return GestureDetector(
       onTap: () {
         // Update the selected product and close the bottom sheet
         setState(() {
           _selectedProduct = product;
-
         });
         Navigator.pop(context);
       },
       child: Card(
-        color: Colors.white,
+        color: cardColor,
         elevation: 4,
         margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1736,32 +2007,55 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Product name
-              _highlightText(product.pname ?? 'N/A', searchQuery),
-              SizedBox(height: 4),
-              // Product code
-              _highlightText("Product Code: ${product.pcode ?? 'N/A'}", searchQuery),
+              Row(
+                children: [
+                  Container(
+                    width: 230,
+                    child: _highlightText("${product.pname}${product.packing}" ?? 'N/A', searchQuery) ,
+                  ),
+                  Spacer(),
+                  _highlightText("(${product.pcode})" ?? 'N/A', searchQuery),
+                ],
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 230,
+                    child:  Text("${product.dmfg}",style: TextStyle(fontSize: 12),),
+                  ),
+
+                  Container(
+                    width: 100,
+                    child: Text(
+                      _selectedCompanyId == 0 ? product.companyname! : "" ?? "N/A",
+                      style: TextStyle(fontSize: 10),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1, // Limit to one line if needed
+                    ),
+                  ),
+
+
+                ],
+              ),
               SizedBox(height: 8),
-              // MRP and PTR row
               Row(
                 children: [
                   Expanded(
                     child: _buildInfoRow3(Icons.currency_rupee, 'MRP:', '${product.mrp ?? 'N/A'}'),
                   ),
-                  SizedBox(width: 16), // Add some space between the two info rows
+                  SizedBox(width: 16),
                   Expanded(
                     child: _buildInfoRow3(Icons.currency_rupee, 'PTR:', '${product.ptr ?? 'N/A'}'),
                   ),
                 ],
               ),
               SizedBox(height: 8),
-              // Stock and Scheme row
               Row(
                 children: [
                   Expanded(
                     child: _buildInfoRow3(Icons.production_quantity_limits, 'Stock:', '${product.totalStock ?? 'N/A'}'),
                   ),
-                  SizedBox(width: 16), // Add some space between the two info rows
+                  SizedBox(width: 16),
                   Expanded(
                     child: _buildInfoRow3(Icons.schema, 'Scheme:', '${product.scheme ?? ''}'),
                   ),
@@ -1795,6 +2089,63 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     );
   }
   Widget _highlightText(String text, String query, {bool fullMatch = false}) {
+    // Treat queries consisting only of spaces as empty
+    if (query.trim().isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(fontWeight: FontWeight.bold), // Make the entire text bold if no query
+        overflow: TextOverflow.ellipsis, // Add ellipsis if text overflows
+      );
+    }
+
+    final spans = <TextSpan>[];
+    final lowercaseText = text.toLowerCase();
+    final lowercaseQuery = query.trim().toLowerCase(); // Trim query to avoid space-only searches
+
+    int start = 0;
+    while (start < text.length) {
+      final index = lowercaseText.indexOf(lowercaseQuery, start);
+
+      if (index == -1) {
+        // Add remaining text if no more matches found
+        spans.add(TextSpan(
+          text: text.substring(start),
+          style: TextStyle(fontWeight: FontWeight.bold), // Make unhighlighted text bold
+        ));
+        break;
+      }
+
+      // Add unhighlighted text before the match
+      if (index > start) {
+        spans.add(TextSpan(
+          text: text.substring(start, index),
+          style: TextStyle(fontWeight: FontWeight.bold), // Make unhighlighted text bold
+        ));
+      }
+
+      // Add highlighted match
+      spans.add(TextSpan(
+        text: text.substring(index, index + lowercaseQuery.length),
+        style: TextStyle(
+          backgroundColor: Colors.yellow,
+          fontWeight: FontWeight.bold, // Highlighted text remains bold
+        ),
+      ));
+
+      start = index + lowercaseQuery.length; // Move start to continue search
+    }
+
+    // Render using RichText, limited to two lines with overflow handling
+    return RichText(
+      overflow: TextOverflow.ellipsis,
+      text: TextSpan(
+        style: TextStyle(color: Colors.black), // Default text color
+        children: spans,
+      ),
+    );
+  }
+
+  Widget _highlightManText(String text, String query, {bool fullMatch = false}) {
     // Treat queries consisting only of spaces as empty
     if (query.trim().isEmpty) {
       return Text(
@@ -1848,6 +2199,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       ),
     );
   }
+
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
@@ -1964,6 +2316,8 @@ class _ProductListWidgetState extends State<ProductListWidget> {
   bool _isLoading = false; // Loading state
   late TextEditingController _remarkController;
   late TextEditingController _rateController;
+  final ScrollController _scrollController = ScrollController();
+  int _expandedIndex = -1;
 
   @override
   void initState() {
@@ -1977,6 +2331,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _rateController.dispose();
     _remarkController.dispose();
     super.dispose();
@@ -1996,6 +2351,24 @@ class _ProductListWidgetState extends State<ProductListWidget> {
         if (item.data != null) {
           products.addAll(item.data!);
         }
+      }
+    });
+  }
+  // Method to scroll to the expanded card
+  void _scrollToExpandedCard(int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Check if index is the last item in the list or if it's off-screen
+      final double cardOffset = 200.0 * index; // Assuming each card height is approx. 200
+      final double currentOffset = _scrollController.offset;
+      final double screenHeight = MediaQuery.of(context).size.height;
+
+      // Scroll to the card if it's hidden or partially off-screen
+      if (cardOffset > currentOffset + screenHeight - 250) {
+        _scrollController.animateTo(
+          cardOffset - 150, // Adjust scroll position to bring the card fully into view
+          duration: Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
       }
     });
   }
@@ -2135,207 +2508,6 @@ class _ProductListWidgetState extends State<ProductListWidget> {
     });
   }
 
-  Widget _buildProductCard(ProductList product, int index) {
-    _rateController = TextEditingController(text: product.ptr ?? "");
-
-    _remarkController = TextEditingController(text: product.remark ?? "");
-    return Dismissible(
-      key: Key(product.hashCode.toString()),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20.0),
-        color: Colors.red,
-        child: const Icon(
-          Icons.delete,
-          color: Colors.white,
-        ),
-      ),
-      confirmDismiss: (direction) async {
-        final bool? shouldDelete = await showDeleteConfirmationSheet(context);
-        if (shouldDelete == true) {
-          removeProduct(product);
-        }
-        return false; // Always return false so onDismissed is not called
-      },
-      onDismissed: (direction) {
-        removeProduct(product);
-      },
-      child: Card(
-        elevation: 2,
-        margin: EdgeInsets.symmetric(horizontal: 5, vertical: 8),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              // Customizing the ExpansionTile icon
-              trailing: Icon(
-                Icons.arrow_circle_down_sharp, // Customize the icon
-                color: Colors.grey, // Change the color if needed
-                size: 18, // Adjust the size
-              ),
-              tilePadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-              expandedCrossAxisAlignment: CrossAxisAlignment.start,
-              expandedAlignment: Alignment.centerLeft,
-              childrenPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '${index + 1}',
-                            style: TextStyle(
-                              color: Colors.blue.shade700,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            product.name!,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ),
-                        _buildInfoChip(
-                          currencyFormat.format(product.total),
-                          Colors.purple,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              subtitle: Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribute space evenly
-                  children: [
-                    Flexible(
-                      flex: 3,
-                      child: _buildInfoChip('MRP: ${product.mrp}', Colors.green),
-                    ),
-
-                    if (product.free! > 0) ...[
-                      Flexible(
-                        flex: 1,
-                        child: _buildInfoChip('Free: ${product.free}', Colors.orange),
-                      ),
-                      SizedBox(width: 12),
-                    ],
-                    Flexible(
-                      flex: 3,
-                      child: _buildInfoChip('PTR: ${product.ptr}', Colors.blueGrey),
-                    ),
-
-                    // Wrap the quantity control in an Expanded widget to allow it to take available space
-                    Expanded(
-                      flex: 3,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 1.0),
-                        child: _buildQuantityControl(product),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(left: 5,right: 5),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildEditableRate(
-                              'Rate',
-                              _rateController,
-                                  (newValue) {
-                                // Your logic to handle changes
-                                print('New Rate: $newValue');
-                              },
-                            ),
-                          ),
-                          SizedBox(width: 16),
-                          Expanded(
-                            child: _buildDetailItem(
-                              'Scheme',
-                              (product.scheme == null || product.scheme!.isEmpty) ? '--' : product.scheme!,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 10),
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 300, // Set your desired width here
-                            height: 50, // Set your desired height here
-                            child: TextField(
-                              controller: _remarkController,
-                              decoration: InputDecoration(
-                                hintText: 'Add remark...',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(
-                                    color: Colors.blue, // Set your desired border color here
-                                    width: 1, // Set the border width if needed
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(
-                                    color: Colors.grey, // Color when the TextField is focused
-                                    width: 1, // Optional: Different width when focused
-                                  ),
-                                ),
-                                filled: true,
-                                fillColor: Colors.grey[50],
-                              ),
-                              onChanged: (value) {
-                                setState(() {
-                                  product.remark = value;
-                                });
-                              },
-                              maxLines: 1,
-                            ),
-                          ),
-                          SizedBox(width: 10), // Space between the TextField and any following widget
-                        ],
-                      ),
-
-
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
 
   @override
@@ -2380,10 +2552,12 @@ class _ProductListWidgetState extends State<ProductListWidget> {
             // Product List
             Expanded(
               child: ListView.builder(
+                controller: _scrollController,
                 itemCount: products.length,
                 padding: EdgeInsets.symmetric(horizontal: 5),
                 itemBuilder: (context, index) {
-                  return _buildProductCard(products[index], index);
+                  final reversedItem = products.reversed.toList()[index];
+                  return _buildProductCard(reversedItem, index);
                 },
               ),
             ),
@@ -2461,6 +2635,226 @@ class _ProductListWidgetState extends State<ProductListWidget> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildProductCard(ProductList product, int index) {
+    _rateController = TextEditingController(text: product.ptr ?? "");
+    _remarkController = TextEditingController(text: product.remark ?? "");
+
+    return Dismissible(
+      key: Key(product.hashCode.toString()),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20.0),
+        color: Colors.red,
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        final bool? shouldDelete = await showDeleteConfirmationSheet(context);
+        if (shouldDelete == true) {
+          removeProduct(product);
+        }
+        return false;
+      },
+      onDismissed: (direction) {
+        removeProduct(product);
+      },
+      child: Card(
+        elevation: 2,
+        margin: EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              key: Key('expansion_tile_${index}'),
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  _expandedIndex = expanded ? index : -1;
+                });
+                if (expanded) {
+                  _scrollToExpandedCard(index);
+                }
+              },
+              initiallyExpanded: _expandedIndex == index,
+              maintainState: false,
+              trailing: Icon(
+                _expandedIndex == index
+                    ? Icons.arrow_circle_up_sharp
+                    : Icons.arrow_circle_down_sharp,
+                color: Colors.grey,
+                size: 18,
+              ),
+              tilePadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+              expandedCrossAxisAlignment: CrossAxisAlignment.start,
+              expandedAlignment: Alignment.centerLeft,
+              childrenPadding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            product.name!,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                        _buildInfoChip(
+                          currencyFormat.format(product.total),
+                          Colors.purple,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              subtitle: Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      flex: 3,
+                      child: _buildInfoChip('MRP: ${product.mrp}', Colors.green),
+                    ),
+                    if (product.free! > 0) ...[
+                      Flexible(
+                        flex: 1,
+                        child: _buildInfoChip('Free: ${product.free}', Colors.orange),
+                      ),
+                      SizedBox(width: 12),
+                    ],
+                    Flexible(
+                      flex: 3,
+                      child: _buildInfoChip('PTR: ${product.ptr}', Colors.blueGrey),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.0),
+                        child: _buildQuantityControl(product),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(left: 5, right: 5),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildEditableRate(
+                              'Rate',
+                              _rateController,
+                                  (newValue) {
+                                // Handle rate change
+                                setState(() {
+
+                                });
+                              },
+                            ),
+                          ),
+                          SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDetailItem(
+                              'Stock',
+                              (product.stock == null || product.stock!.isEmpty)
+                                  ? '--'
+                                  : product.stock!,
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: _buildDetailItem(
+                              'Scheme',
+                              (product.scheme == null || product.scheme!.isEmpty)
+                                  ? '--'
+                                  : product.scheme!,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 10),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 300,
+                            height: 50,
+                            child: TextField(
+                              controller: _remarkController,
+                              decoration: InputDecoration(
+                                hintText: 'Add remark...',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(
+                                    color: Colors.blue,
+                                    width: 1,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey,
+                                    width: 1,
+                                  ),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey[50],
+                              ),
+                              onChanged: (value) {
+                                setState(() {
+                                  product.remark = value;
+                                });
+                              },
+                              maxLines: 1,
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -2778,7 +3172,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
             ),
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 13,
             ),
             onChanged: (value) {
               final newRate = double.tryParse(value);

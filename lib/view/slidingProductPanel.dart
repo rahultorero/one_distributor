@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../components/RipplePageRoute.dart';
 import '../dataModels/ProductListModel.dart';
@@ -114,6 +116,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
   @override
   void didUpdateWidget(SlidingProductPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    print("check the updateee ${json.encode(widget.productListItem)}");
     if (widget.productListItem.length != _previousItemCount) {
       _badgeController.forward(from: 0.0);
       _previousItemCount = widget.productListItem.length;

@@ -36,6 +36,7 @@ class _HomeState extends State<Home>
   late AnimationController? _onBoardingAnimController;
   late Animation<double> _onBoardingAnim;
   late Animation<double> _sidebarAnim;
+  DateTime? _lastPressedAt;
 
   late SMIBool _menuBtn;
 
@@ -130,7 +131,22 @@ class _HomeState extends State<Home>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WillPopScope(
+        onWillPop: () async {
+      if (_lastPressedAt == null || DateTime.now().difference(_lastPressedAt!) > const Duration(seconds: 2)) {
+        // Show snackbar or other UI element to inform the user
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Press back again to exit'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        _lastPressedAt = DateTime.now();
+        return false; // Prevent back button from closing the app
+      }
+      return true; // Allow back button to close the app
+    },child:
+      Scaffold(
       extendBody: true,
       body: Stack(
         children: [
@@ -328,7 +344,7 @@ class _HomeState extends State<Home>
           ),
         ],
       ),
-
+      ),
     );
   }
 }

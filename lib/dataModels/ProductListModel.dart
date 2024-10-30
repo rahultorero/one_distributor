@@ -75,6 +75,7 @@ class ProductList {
   int? companyid;
   int? pid;
   int? odid;
+  String? stock;
   double? get total => qty! * rate!;
 
   ProductList(
@@ -94,6 +95,7 @@ class ProductList {
         this.remark,
         this.companyid,
         this.pid,
+        this.stock,
         this.odid});
 
   ProductList.fromJson(Map<String, dynamic> json) {

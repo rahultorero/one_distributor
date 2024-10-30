@@ -1,22 +1,20 @@
-import 'package:distributers_app/navigation/home_tab_view.dart';
-import 'package:distributers_app/view/SalesOrders.dart';
-import 'package:distributers_app/view/UserList.dart';
-import 'package:distributers_app/view/draftOrders.dart';
-import 'package:distributers_app/view/mainScreen.dart';
-import 'package:distributers_app/view/outStandingList.dart';
-import 'package:distributers_app/view/profileScreen.dart';
-import 'package:distributers_app/view/salesInvoice.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../assets.dart' as app_assets;
 import '../components/menu_row.dart';
-import '../models/menu_dart.dart'; // Ensure the correct import path
+import '../models/menu_dart.dart';
 import '../theme.dart';
 import 'dart:math' as math;
-
+import '../view/ProductMappingScreen.dart';
+import '../view/SalesOrders.dart';
+import '../view/UserList.dart';
+import '../view/draftOrders.dart';
 import '../view/home.dart';
+import '../view/mainScreen.dart';
+import '../view/outStandingList.dart';
+import '../view/profileScreen.dart';
+import '../view/salesInvoice.dart';
 
 class SideMenu extends StatefulWidget {
   const SideMenu({Key? key}) : super(key: key);
@@ -28,32 +26,159 @@ class SideMenu extends StatefulWidget {
 class _SideMenuState extends State<SideMenu> {
   final List<MenuItemModel> _browseMenuIcons = MenuItemModel.menuItems;
   final List<MenuItemModel> _themeMenuIcon = MenuItemModel.menuItems3;
-  String _selectedMenu = MenuItemModel.menuItems[0].title;
+
+  String? _selectedMenu;
   bool _isDarkMode = false;
-  String? name = '';
+  String? name;
   String? division;
 
   @override
   void initState() {
-    getProfile();
     super.initState();
+    getProfile();
   }
+
   Future<void> getProfile() async {
-    name = await _getName();
-    division = await _getDivision();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        name = prefs.getString("user") ?? '';
+        division = prefs.getString("division") ?? '';
+      });
+    } catch (e) {
+      print("Error loading profile: $e");
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Clear specific keys instead of all preferences
+      await prefs.remove("user");
+      await prefs.remove("division");
+      await prefs.remove("isLoggedIn");
+      await prefs.remove("reg_code");
+      await prefs.remove("u_id");
+      await prefs.remove("companyId");
+      await prefs.remove("smid");
+
+      // Set login status to false
+      await prefs.setBool("isLoggedIn", false);
+
+      // Navigate and clear stack
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => MainScreens()),
+              (route) => false,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Logout failed: $e')),
+        );
+      }
+    }
+  }
+
+  void onMenuPress(MenuItemModel menu) {
+    setState(() {
+      _selectedMenu = menu.title;
+    });
+
+    if (menu.route != null) {
+      if (menu.route == '/logout') {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: Text('Confirm Logout'),
+              content: Text('Are you sure you want to logout?'),
+              actions: [
+                TextButton(
+                  child: Text('Cancel'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                TextButton(
+                  child: Text('Logout'),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _handleLogout();
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => _getPageForRoute(menu.route!),
+          ),
+        ).then((_) {
+          // Don't reset selection when returning
+          // setState(() {
+          //   _selectedMenu = null;
+          // });
+        });
+      }
+    }
+  }
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                setState(() {
+                  _selectedMenu = null;
+                });
+              },
+            ),
+            TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Logout'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _handleLogout();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
 
-  Future<String?> _getName() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString("user"); // Replace with your key
+  Widget _getPageForRoute(String route) {
+    switch (route) {
+      case '/home':
+        return Home();
+      case '/user':
+        return UsersListScreen();
+      case '/sales_invoice':
+        return SalesInvoiceScreen();
+      case '/sales_order':
+        return SalesOrderList();
+      case '/draft_order':
+        return DraftOrderList();
+      case '/product_map':
+        return ProductMappingScreen();
+      case '/out_standing':
+        return OutStandingList();
+      default:
+        return Container();
+    }
   }
-
-  Future<String?> _getDivision() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    return prefs.getString("division"); // Replace with your key
-  }
-
 
   void onThemeRiveIconInit(Artboard artboard) {
     if (_themeMenuIcon.isNotEmpty && _themeMenuIcon[0].riveIcon != null) {
@@ -63,15 +188,6 @@ class _SideMenuState extends State<SideMenu> {
         artboard.addController(controller);
         _themeMenuIcon[0].riveIcon!.status = controller.findInput<bool>("active") as SMIBool;
       }
-    }
-  }
-
-  void onThemeToggle(bool value) {
-    setState(() {
-      _isDarkMode = value;
-    });
-    if (_themeMenuIcon.isNotEmpty && _themeMenuIcon[0].riveIcon != null) {
-      _themeMenuIcon[0].riveIcon!.status?.change(value); // Ensure riveIcon status is non-null
     }
   }
 
@@ -97,7 +213,7 @@ class _SideMenuState extends State<SideMenu> {
                 children: [
                   MenuButtonSection(
                     title: "BROWSE",
-                    selectedMenu: _selectedMenu,
+                    selectedMenu: _selectedMenu ?? "",
                     menuIcons: _browseMenuIcons,
                     onMenuPress: onMenuPress,
                   ),
@@ -116,7 +232,6 @@ class _SideMenuState extends State<SideMenu> {
       padding: const EdgeInsets.all(16),
       child: InkWell(
         onTap: () {
-          // Navigate to ProfileScreen
           Navigator.of(context).push(
             MaterialPageRoute(builder: (context) => ProfileScreen()),
           );
@@ -129,31 +244,32 @@ class _SideMenuState extends State<SideMenu> {
               child: const Icon(Icons.person_outline),
             ),
             const SizedBox(width: 8),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children:  [
-                Text(
-                  name! ?? '',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontFamily: "Inter",
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name ?? '',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontFamily: "Inter",
+                    ),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  division ?? '',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontFamily: "Inter",
+                  const SizedBox(height: 2),
+                  Text(
+                    division ?? '',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontFamily: "Inter",
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1, // Limits the text to one line
-                ),
-
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -162,98 +278,55 @@ class _SideMenuState extends State<SideMenu> {
   }
 
   Widget _buildThemeToggle() {
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: Opacity(
-              opacity: 0.6,
-              child: _buildRiveAnimation(),
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              _themeMenuIcon.isNotEmpty ? _themeMenuIcon[0].title : '',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontFamily: "Inter",
-                fontWeight: FontWeight.w600,
+    return InkWell(
+      onTap: () {
+        // Check if menuItems3 has the logout item
+        if (_themeMenuIcon.isNotEmpty) {
+          final logoutMenu = _themeMenuIcon[0];
+          if (logoutMenu.route == '/logout') {
+            _showLogoutDialog();
+          }
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 32,
+              height: 32,
+              child: Opacity(
+                opacity: 0.6,
+                child: _themeMenuIcon.isNotEmpty && _themeMenuIcon[0].riveIcon != null
+                    ? RiveAnimation.asset(
+                  app_assets.iconsRiv,
+                  stateMachines: [_themeMenuIcon[0].riveIcon!.stateMachine],
+                  artboard: _themeMenuIcon[0].riveIcon!.artboard,
+                  onInit: onThemeRiveIconInit,
+                )
+                    : Icon(
+                  _themeMenuIcon.isNotEmpty
+                      ? _themeMenuIcon[0].flutterIcon ?? Icons.logout
+                      : Icons.logout,
+                  color: Colors.white,
+                ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                _themeMenuIcon.isNotEmpty ? _themeMenuIcon[0].title : '',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontFamily: "Inter",
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    );
-  }
-
-  void onMenuPress(MenuItemModel menu) {
-    setState(() {
-      _selectedMenu = menu.title;
-    });
-
-    // Handle navigation based on the menu item's route
-    if (menu.route != null) {
-      if (menu.route == '/logout') {
-        // Handle the logout process
-        _handleLogout();
-      } else {
-        // Navigate to the selected route
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) {
-              return _getPageForRoute(menu.route!);
-            },
-          ),
-        );
-      }
-    }
-  }
-
-  Widget _getPageForRoute(String route) {
-    switch (route) {
-      case '/home':
-        return Home(); // Replace with your Home screen widget
-      case '/user':
-        return UsersListScreen();
-      case '/sales_invoice':
-        return SalesInvoiceScreen(); // Your Sales Invoice screen widget
-      case '/sales_order':
-        return SalesOrderList(); // You may want to change this to the actual order screen
-      case '/draft_order':
-        return DraftOrderList();
-      case '/out_standing':
-        return OutStandingList();
-      default:
-        return Container(); // Fallback widget
-    }
-  }
-
-  // Logout handling method
-  void _handleLogout() {
-    // Perform logout logic here, like clearing user session data
-    print("Logging out...");
-
-    // Navigate to the MainScreens (Login or Welcome screen)
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => MainScreens()),
-    );
-  }
-
-  Widget _buildRiveAnimation() {
-    if (_themeMenuIcon.isEmpty || _themeMenuIcon[0].riveIcon == null) {
-      return const SizedBox.shrink(); // Return an empty widget if there's no valid Rive icon
-    }
-
-    return RiveAnimation.asset(
-      app_assets.iconsRiv, // Ensure this is a valid path
-      stateMachines: [_themeMenuIcon[0].riveIcon!.stateMachine],
-      artboard: _themeMenuIcon[0].riveIcon!.artboard,
-      onInit: onThemeRiveIconInit,
     );
   }
 }
@@ -263,7 +336,7 @@ class MenuButtonSection extends StatefulWidget {
     Key? key,
     required this.title,
     required this.menuIcons,
-    this.selectedMenu = "Home",
+    required this.selectedMenu,
     this.onMenuPress,
   }) : super(key: key);
 
@@ -273,75 +346,103 @@ class MenuButtonSection extends StatefulWidget {
   final Function(MenuItemModel menu)? onMenuPress;
 
   @override
-  _MenuButtonSectionState createState() => _MenuButtonSectionState();
+  State<MenuButtonSection> createState() => _MenuButtonSectionState();
 }
 
 class _MenuButtonSectionState extends State<MenuButtonSection> {
-  String? expandedMenu; // To keep track of which menu is expanded
+  String? expandedMenu;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 24, right: 24, top: 40, bottom: 8),
-          child: Text(
-            widget.title,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 13,
-              fontFamily: "Inter",
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Container(
-          margin: const EdgeInsets.all(8),
-          child: Column(
-            children: widget.menuIcons.map((menu) {
-              return Column(
-                children: [
-                  Divider(
-                    color: Colors.white.withOpacity(0.1),
-                    thickness: 1,
-                    height: 1,
-                    indent: 16,
-                    endIndent: 16,
-                  ),
-                  MenuRow(
-                    menu: menu,
-                    selectedMenu: widget.selectedMenu,
-                    onMenuPress: () {
-                      // Check if the menu item has children
-                      if (menu.children.isNotEmpty) {
-                        setState(() {
-                          expandedMenu = expandedMenu == menu.title ? null : menu.title; // Toggle expansion
-                        });
-                      } else {
-                        widget.onMenuPress!(menu);
-                      }
-                    },
-                  ),
-                  // Render child items if the menu is expanded
-                  if (expandedMenu == menu.title)
-                    ...menu.children.map((childMenu) {
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 40), // Indent child items
-                        child: MenuRow(
-                          menu: childMenu,
-                          selectedMenu: widget.selectedMenu,
-                          onMenuPress: () => widget.onMenuPress!(childMenu),
-                        ),
-                      );
-                    }).toList(),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
+        _buildSectionHeader(),
+        _buildMenuItems(),
       ],
     );
   }
-}
 
+  Widget _buildSectionHeader() {
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, right: 24, top: 40, bottom: 8),
+      child: Text(
+        widget.title,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.7),
+          fontSize: 13,
+          fontFamily: "Inter",
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItems() {
+    return Container(
+      margin: const EdgeInsets.all(8),
+      child: Column(
+        children: widget.menuIcons.map((menu) {
+          final bool isSelected = widget.selectedMenu == menu.title;
+
+          return Column(
+            children: [
+              Divider(
+                color: Colors.white.withOpacity(0.1),
+                thickness: 1,
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: MenuRow(
+                  menu: menu,
+                  selectedMenu: widget.selectedMenu,
+                  onMenuPress: () => _handleMenuPress(menu),
+                  isSelected: isSelected,
+                ),
+              ),
+              if (expandedMenu == menu.title) ..._buildChildMenuItems(menu),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  List<Widget> _buildChildMenuItems(MenuItemModel parentMenu) {
+    return parentMenu.children.map((childMenu) {
+      final bool isChildSelected = widget.selectedMenu == childMenu.title;
+
+      return Padding(
+        padding: const EdgeInsets.only(left: 40),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isChildSelected ? Colors.white.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: MenuRow(
+            menu: childMenu,
+            selectedMenu: widget.selectedMenu,
+            onMenuPress: () => widget.onMenuPress?.call(childMenu),
+            isSelected: isChildSelected,
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  void _handleMenuPress(MenuItemModel menu) {
+    if (menu.children.isNotEmpty) {
+      setState(() {
+        expandedMenu = expandedMenu == menu.title ? null : menu.title;
+      });
+    } else {
+      widget.onMenuPress?.call(menu);
+    }
+  }
+}

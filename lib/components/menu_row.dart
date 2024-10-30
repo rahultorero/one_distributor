@@ -6,12 +6,13 @@ import '../models/menu_dart.dart';
 
 class MenuRow extends StatelessWidget {
   const MenuRow(
-      {Key? key, required this.menu, this.selectedMenu = "Home", this.onMenuPress})
+      {Key? key, required this.menu, this.selectedMenu = "Home", this.onMenuPress,required this.isSelected})
       : super(key: key);
 
   final MenuItemModel menu;
   final String selectedMenu;
   final Function? onMenuPress;
+  final bool isSelected;
 
   void _onMenuIconInit(Artboard artboard) {
     if (menu.riveIcon != null) {

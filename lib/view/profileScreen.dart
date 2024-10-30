@@ -378,6 +378,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       'code': savedUsername,
     };
 
+    print(body);
+
     final response = await http.post(
       Uri.parse(url),
       headers: {

@@ -86,6 +86,8 @@ flutter:
     - assets/rive/
     - assets/animations/empty_state.json
     - assets/animations/order.json
+    - assets/animations/empty_state2.json
+
 
 
 

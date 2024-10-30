@@ -30,6 +30,8 @@ class OrderListRes {
   final String area;
   final String city;
   final String sman;
+  final String billStatus;
+  final String uploaded;
 
   OrderListRes({
     required this.userName,
@@ -63,6 +65,8 @@ class OrderListRes {
     required this.area,
     required this.city,
     required this.sman,
+    required this.billStatus,
+    required this.uploaded
   });
 
   factory OrderListRes.fromJson(Map<String, dynamic> json) {
@@ -98,6 +102,8 @@ class OrderListRes {
       area: json['area'] as String? ?? '',
       city: json['city'] as String? ?? '',
       sman: json['sman'] as String? ?? '',
+      billStatus: json['bill_status'] as String ?? '',
+      uploaded: json['uploaded'] as String ?? ''
     );
   }
 
@@ -134,6 +140,8 @@ class OrderListRes {
       'area': area,
       'city': city,
       'sman': sman,
+      'bill_status' : billStatus,
+      'uploaded' : uploaded
     };
   }
 }
