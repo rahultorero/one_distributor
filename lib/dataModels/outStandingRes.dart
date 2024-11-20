@@ -80,6 +80,7 @@ class Party {
   final String city;
   final int pincode;
   final String? telephone;
+  final String? credit_limit;
   final String? mobile;
   final String? email;
   final String? zone;
@@ -102,6 +103,7 @@ class Party {
     required this.pincode,
     this.telephone,
     this.mobile,
+    this.credit_limit,
     this.email,
     this.zone,
     required this.companyName,
@@ -133,6 +135,7 @@ class Party {
       zone: json['zone']?.toString(), // Safe conversion to String
       companyName: json['companyname'].toString(), // Convert to String
       companyId: json['companyid'] is String ? int.parse(json['companyid']) : json['companyid'], // Convert to int
+      credit_limit: json['credit_limit'] ?? "",
       receivableData: receivableDataList,
     );
   }

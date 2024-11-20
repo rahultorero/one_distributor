@@ -1,9 +1,11 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:distributers_app/components/BottomSheetsViews/frequentlyPurchase.dart';
 import 'package:distributers_app/components/LoadingIndicator.dart';
+import 'package:distributers_app/dataModels/DraftListRes.dart';
 import 'package:distributers_app/dataModels/FrequentlyPurchase.dart';
 import 'package:distributers_app/dataModels/ReceivableListRes.dart';
 import 'package:distributers_app/view/SalesOrders.dart';
@@ -56,12 +58,19 @@ class DeliveryOption {
 
 
 
-class NewSalesOrder extends StatefulWidget {
+class DraftSalesOrder extends StatefulWidget {
+  final DraftOrderRes draftOrder;
+
+  const DraftSalesOrder({
+    Key? key,
+    required this.draftOrder
+  }) : super(key: key);
+  
   @override
-  _NewSalesOrderState createState() => _NewSalesOrderState();
+  _DraftSalesOrderState createState() => _DraftSalesOrderState();
 }
 
-class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProviderStateMixin {
+class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   late TabController _tabController;
   Customer? _selectedCustomer;
@@ -118,7 +127,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     super.initState();
     searchFocusNode = FocusNode();
     searchController = TextEditingController();
-    print("NewSalesOrder State Initialized"); // Debug print
+    print("DraftSalesOrder State Initialized"); // Debug print
     _checkTutorialStatus(); // Add this method to check if tutorial should be shown
 
 
@@ -147,13 +156,13 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     _selectedDeliveryId = int.parse(_selectedDelivery!.value);
 
 
-    selectAdd = TextEditingController();
-    selectArea = TextEditingController();
-    selectCity = TextEditingController();
-    selectTel = TextEditingController();
-    selectMob = TextEditingController();
+    selectAdd = TextEditingController(text: "${widget.draftOrder.add1},${widget.draftOrder.add2}");
+    selectArea = TextEditingController(text:widget.draftOrder.area);
+    selectCity = TextEditingController(text: widget.draftOrder.city);
+    selectTel = TextEditingController(text: widget.draftOrder.teleno);
+    selectMob = TextEditingController(text: widget.draftOrder.mobileNo);
     selectOsAmt = TextEditingController();
-    selectRemark = TextEditingController();
+    selectRemark = TextEditingController(text: widget.draftOrder.oreMark);
     _quantityController.text = _quantity.toString(); // Set initial value
 
     _tabController = TabController(length: 2, vsync: this);
@@ -170,6 +179,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
 
 
+    print("calinggggggggggggggggggg");
   }
 
   @override
@@ -211,13 +221,59 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     print("check salesIdd ${_selectedCustomerId}");
     print("check salesIdd ${regCode}");
     product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: "false",regCode: regCode!,smanId: smid!))!; // Then call the second function
-
+    checkAndFetchReceivable();
+    addExisting();
     for (var store in product.data!) {
       // Loop through each party in the party list of the store
 
       retailerList = store.party!;
       productList = store.product!;
     }
+  }
+
+  Future<void> addExisting() async{
+
+    List<int> d_companyId = [];
+    List<ProductList> products = widget.draftOrder.details.map((selectedProduct) {
+      print("company iddd checkkkk ${selectedProduct.companyId}");
+      int? selectedCompanyId = selectedProduct.companyId;
+      if (!d_companyId.contains(selectedCompanyId)) {
+        d_companyId.add(selectedCompanyId!);
+      }
+      return ProductList(
+        name: selectedProduct.pname,
+        packing: selectedProduct.pcode.toString(),
+        scheme: "",
+        itemDetailid: selectedProduct.itemDetailId,
+        ledidParty: _selectedRetailer?.ledidParty,
+        qty: selectedProduct.qty ?? 0,
+        rate: double.parse(selectedProduct.ptr ?? '0.0'),
+        free: selectedProduct.free,
+        mrp: selectedProduct.mrp,
+        ptr: selectedProduct.ptr,
+        remark: selectedProduct.remark,
+        companyid: selectedProduct.companyId,
+        stock: ""!,
+        pid: selectedProduct.pid,
+        odid: selectedProduct.odid,
+      );
+    }).toList();
+
+    ProductListItem orderItem = ProductListItem(
+      data: products,
+      companyId: d_companyId,
+      salesmanId: _selectedRetailer?.smanid ?? widget.draftOrder.smanId,
+      cusrid: userId,
+      userType: "Distributor",
+      dType: _selectedDeliveryId,
+      remark: widget.draftOrder.oreMark,
+      grpCode: widget.draftOrder.grpCode ?? widget.draftOrder.regCode,
+      ohid: widget.draftOrder.ohid,
+      orderStatus: 1,
+    );
+
+    addProduct(orderItem);
+
   }
 
   Future<void> _fetchDivisionAndCompanies() async {
@@ -271,20 +327,16 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   }
 
   Future<void> checkAndFetchReceivable() async {
-    if (_selectedRetailer != null) {
       // Fetch receivable data if _selectedRetailer is not null
       receivableList = await fetchReceivable();
       frequentlyList = await fetchFrequently();
       bouncedList = await fetchBounced();
       setState(() {
-        selectOsAmt?.text = receivableList!.total.toString();
+        selectOsAmt?.text = receivableList?.total.toString() ?? "";
       });
 
       print("check the receivavle $receivableList");
-    } else {
-      // Handle the case where _selectedRetailer is null
-      print("Retailer is not selected");
-    }
+
   }
 
 
@@ -293,7 +345,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       Map<String, dynamic> requestBody = {
         'reg_code': regCode?.substring(0, 7),
         'company_id': _selectedCustomerId,
-        'ledid_party': _selectedRetailer?.ledidParty,
+        'ledid_party': _selectedRetailer?.ledidParty ?? widget.draftOrder.ledidParty,
       };
 
       final response = await http.post(
@@ -306,7 +358,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       if (response.statusCode == 200) {
         // Decode the response as a map
         final Map<String, dynamic> data = jsonDecode(response.body);
-        print("check the receivable ${response.body}"); // Log the response for debugging
+        print("check the receivablesss ${data.toString()}"); // Log the response for debugging
 
         // Parse the response into a ReceivableListRes object
         ReceivableListRes receivableListRes = ReceivableListRes.fromJson(data);
@@ -330,7 +382,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       Map<String, dynamic> requestBody = {
         'regcode': regCode?.substring(0, 7),
         'company_id': _selectedCustomerId,
-        'ledid_party': _selectedRetailer?.ledidParty,
+        'ledid_party': _selectedRetailer?.ledidParty ?? widget.draftOrder.ledidParty,
       };
 
       final response = await http.post(
@@ -367,7 +419,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       Map<String, dynamic> requestBody = {
         'regcode': regCode?.substring(0, 7),
         'company_id': _selectedCustomerId,
-        'ledid_party': _selectedRetailer?.ledidParty,
+        'ledid_party': _selectedRetailer?.ledidParty ??  widget.draftOrder.ledidParty,
       };
 
       final response = await http.post(
@@ -683,7 +735,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
-    print("Building NewSalesOrder, showTutorial: $_showTutorial"); // Debug print
+    print("Building DraftSalesOrder, showTutorial: $_showTutorial"); // Debug print
 
     Widget mainContent =
     WillPopScope(
@@ -692,7 +744,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
         backgroundColor: Colors.grey.shade200, // Subtle background color
         body: isLoading
             ? Center(child: LoadingIndicator()):
-        SlidingProductPanel(productListItem: productListItem,smId: _selectedRetailer?.smanid.toString() ?? "",ledidParty: _selectedRetailer?.ledidParty.toString() ?? "",
+        SlidingProductPanel(productListItem: productListItem,smId: _selectedRetailer?.smanid.toString() ?? widget.draftOrder.smanId.toString(),ledidParty: _selectedRetailer?.ledidParty.toString() ?? widget.draftOrder.ledidParty,
           child: CustomScrollView(
             slivers: [
               SliverAppBar(
@@ -969,7 +1021,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                               'Retailer',
                                               _selectedRetailer != null && _selectedRetailer!.partyname!.isNotEmpty
                                                   ? _selectedRetailer!.partyname! // Display party name if selected
-                                                  : 'Select Retailer', // Default text when no retailer is selected
+                                                  : widget.draftOrder.partyName, // Default text when no retailer is selected
                                             ),
                                           ),
                                           SizedBox(height: 10), // Add spacing between elements
@@ -1875,7 +1927,6 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
 
   void addProduct(ProductListItem orderItem) async {
-    print("check the added itemss${orderItem.toJson()}");
     // Check if the item already exists in the list
     final existingIndex = productListItem.indexWhere((item) => item.data?[0].pid == orderItem.data?[0].pid);
 
@@ -2075,6 +2126,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   }
 
   void _showProductBottomSheet(BuildContext context, {Function(Product)? onProductSelected}) {
+
+
     final searchController = TextEditingController();
     final quantityController = TextEditingController();
     final remarkController = TextEditingController();
@@ -2153,7 +2206,9 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
         addProduct(orderItem);
       }
+
       Navigator.pop(context);
+
     }
 
     showModalBottomSheet(
@@ -2953,9 +3008,6 @@ class _ProductListWidgetState extends State<ProductListWidget> {
   }
 
   Widget _buildProductCard(ProductList product, int index) {
-
-    print("check the product ${product.toJson()}");
-
     _rateController = TextEditingController(text: product.ptr ?? "");
     _remarkController = TextEditingController(text: product.remark ?? "");
 
@@ -3192,12 +3244,11 @@ class _ProductListWidgetState extends State<ProductListWidget> {
       );
     }
 
-    print(" check the bvaliesss ${widget.ledidParty}");
+    print(" check the jhhhj ${widget.ledidParty}");
 
     List<Orders> orders = [];
     for (var items in product) {
       print("odid valuess check ${items.odid}");
-
       orders.add(Orders(
         itemDetailid: items.itemDetailid!,
         ledidParty:int.parse(widget.ledidParty) ,
@@ -3247,7 +3298,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
           _isLoading = false; // Hide loader
         });
 
-        if (response.statusCode == 201 || response.statusCode == 200) {
+        if (response.statusCode == 201) {
           final responseBody = jsonDecode(response.body);
           print('Order submitted successfully: $responseBody');
 
@@ -3321,7 +3372,6 @@ class _ProductListWidgetState extends State<ProductListWidget> {
     }
     List<Orders> orders = [];
     for (var items in product) {
-      print("odid valuess check ${items.odid}");
       orders.add(Orders(
         itemDetailid: items.itemDetailid!,
         ledidParty: int.parse(widget.ledidParty) ,
@@ -3371,7 +3421,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
           _isLoading = false; // Hide loader
         });
 
-        if (response.statusCode == 201 || response.statusCode == 200) {
+        if (response.statusCode == 201) {
           final responseBody = jsonDecode(response.body);
           print('Order submitted successfully: $responseBody');
 

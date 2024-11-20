@@ -10,7 +10,7 @@ class RipplePageRoute<T> extends PageRoute<T> {
   RipplePageRoute({
     required this.builder,
     required this.center,
-    this.radius = 800.0,
+    this.radius = 1500.0,
     this.duration = const Duration(milliseconds: 400),
   });
 

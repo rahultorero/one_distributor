@@ -1196,12 +1196,20 @@ class _CategoryScreenState extends State<CategoryScreen> {
     _selectedCheckboxIndustry = widget.businessDetail.fxdname;
     _updateDropdownItems();
     formData.selectedCategory = widget.businessDetail.fxdsubname;
-    if (formData.selectedCategory != null) {
+    if (formData.selectedCategory != null && _currentDropdownItems.isNotEmpty) {
+      print("check category values: ${_currentDropdownItems.first}");
+
+      // Provide a fallback that ensures non-null value
       _selectedIndustry = _currentDropdownItems.firstWhere(
             (category) => category.fxdsubname == widget.businessDetail.fxdsubname,
         orElse: () => _currentDropdownItems.first,
       );
+    } else {
+      print("No categories available or selected category is null.");
+      // Optionally, set _selectedIndustry to a default value if needed.
     }
+
+
   }
 
   // Update the dropdown items based on the selected industry checkbox

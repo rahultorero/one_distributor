@@ -8,12 +8,16 @@ import 'newSalesOrder.dart';
 class SlidingProductPanel extends StatefulWidget {
   final List<ProductListItem> productListItem;
   final Widget child;
+  final String ledidParty;
+  final String smId;
   final Function(List<ProductListItem>)? onProductListUpdated; // Add callback
 
   const SlidingProductPanel({
     Key? key,
     required this.productListItem,
     required this.child,
+    required this.ledidParty,
+    required this.smId,
     this.onProductListUpdated,
   }) : super(key: key);
 
@@ -119,7 +123,8 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
     print("check the updateee ${json.encode(widget.productListItem)}");
     if (widget.productListItem.length != _previousItemCount) {
       _badgeController.forward(from: 0.0);
-      _previousItemCount = widget.productListItem.length;
+      _previousItemCount =widget.productListItem.length ?? 0;
+      print("lenghthhhhhh${widget.productListItem.length}");
     }
   }
 
@@ -155,7 +160,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
 
 
   Widget _buildPanelContent(BuildContext context) {
-    double panelHeight = MediaQuery.of(context).size.height * 0.9;
+    double panelHeight = MediaQuery.of(context).size.height * 0.91;
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -170,14 +175,14 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
             child: Material(
               elevation: 8,
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(16),
+                topLeft: Radius.circular(5),
                 bottomLeft: Radius.circular(16),
               ),
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(16),
+                    topLeft: Radius.circular(5),
                     bottomLeft: Radius.circular(16),
                   ),
                 ),
@@ -189,7 +194,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
                       decoration: BoxDecoration(
                         color: Colors.blue.shade700,
                         borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(16),
+                          topLeft: Radius.circular(5),
                         ),
                       ),
                       child: Row(
@@ -221,6 +226,8 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
                     Expanded(
                       child: ProductListWidget(
                         productListItem: widget.productListItem,
+                        smId: widget.smId,
+                        ledidParty: widget.ledidParty,
                         onProductListUpdated: updateProductList,
                       ),
                     ),
@@ -305,7 +312,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
                                           ],
                                         ),
                                         child: Text(
-                                          '${widget.productListItem.length}',
+                                          '${widget.productListItem.length ?? 0}',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 12,
@@ -404,6 +411,8 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
                           Expanded(
                             child: ProductListWidget(
                               productListItem: widget.productListItem,
+                              ledidParty: widget.ledidParty,
+                              smId: widget.smId,
                             ),
                           ),
                         ],

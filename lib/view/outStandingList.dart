@@ -1,19 +1,40 @@
+import 'dart:io';
+import 'dart:ui';
+
 import 'package:distributers_app/components/LoadingIndicator.dart';
 import 'package:distributers_app/dataModels/DraftListRes.dart';
 import 'package:distributers_app/dataModels/OrderDetailsRes.dart';
 import 'package:distributers_app/services/api_services.dart';
 import 'package:distributers_app/view/profileScreen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
+import '../components/OutStandingPdfCreator.dart';
 import '../dataModels/OrderListRes.dart';
 import '../dataModels/StoreModel.dart';
 import '../dataModels/outStandingRes.dart';
 import '../theme.dart';
 import '../dataModels/StoreModel.dart';
+import 'package:url_launcher/url_launcher.dart' as launcher;
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:flutter_svg/flutter_svg.dart' as svg;
+
 
 class OutStandingList extends StatefulWidget {
   @override
@@ -48,6 +69,9 @@ class _OutStandingListState extends State<OutStandingList> {
     fetchData();
     filteredOrders = orders;
 
+    searchController.addListener(() {
+      filterOrders(searchController.text);
+    });
 
   }
 
@@ -177,6 +201,9 @@ class _OutStandingListState extends State<OutStandingList> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Adjust the tablet breakpoint to match your device
+    final isTablet = screenWidth >= 533;
     return Scaffold(
       appBar: AppBar(
         title: Text('Outstanding Distributor'),
@@ -216,7 +243,13 @@ class _OutStandingListState extends State<OutStandingList> {
             Expanded(
               child: filteredOrders.isEmpty
                   ? Center(child: LoadingIndicator())
-                  : ListView.builder(
+                  : GridView.builder(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isTablet ? 2 : 1,
+                // Lower the childAspectRatio to increase the height of the card
+                childAspectRatio: isTablet ? 2.5:2.57, // Adjust this value to make the card taller
+                crossAxisSpacing: 1,
+                mainAxisSpacing: 5,
+              ),
                 itemCount: filteredOrders.length,
                 itemBuilder: (context, index) {
                   final order = filteredOrders[index];
@@ -227,48 +260,202 @@ class _OutStandingListState extends State<OutStandingList> {
                     child: Container(
                       margin: EdgeInsets.symmetric(horizontal: 4, vertical: 2), // Reduced margin
                       child: Card(
-                        color: Colors.white,
-                        elevation: 2, // Reduced elevation
+                        elevation: 2,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8), // Slightly rounded corners
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0), // Reduced padding
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      order.partyName,
-                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600), // Slightly smaller font
-                                      overflow: TextOverflow.ellipsis,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white,
+                                Colors.teal.shade50.withOpacity(0.3),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.teal.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Icon(
+                                        Icons.business,
+                                        color: Colors.teal,
+                                        size: 16,
+                                      ),
                                     ),
-                                  ),
-                                  SizedBox(width: 2),
-                                  Text(
-                                    "(${order.partyCode})",
-                                    style: TextStyle(fontSize: 14, color: Colors.black54), // Smaller font
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4), // Reduced spacing
-                              _buildInfoRow(Icons.location_on, 'Location:', '${order.area ?? ''}, ${order.city ?? ''}'),
-                              _buildInfoRow(Icons.phone, 'Phone:', order.mobile ?? 'N/A'),
-                              _buildInfoRow(Icons.email, 'Email:', order.email ?? 'N/A'),
-                              const SizedBox(height: 6), // Space before amount
-                              Divider(color: Colors.grey, thickness: 0.5), // Subtle divider
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: Text(
-                                  'Amt: ₹${order.totalBalance?.toStringAsFixed(2) ?? '0.00'}',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.teal), // Smaller amount font
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              order.partyName,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w600,
+                                                color: Colors.black87,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          Text(
+                                            "(${order.partyCode})",
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(width: 4),
+                                    IconButton(
+                                      icon: Icon(Icons.share_rounded, size: 18),
+                                      padding: EdgeInsets.zero,
+                                      constraints: BoxConstraints(
+                                        minWidth: 28,
+                                        minHeight: 28,
+                                      ),
+                                      color: Colors.teal,
+                                      onPressed:(){ sharePdf(order);
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
+                                SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: Column(
+                                        children: [
+                                          InkWell(
+                                            onTap: () {
+                                              // Handle location tap if needed
+                                            },
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.location_on_outlined, size: 14, color: Colors.teal),
+                                                SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    '${order.area ?? ''}, ${order.city ?? ''}',
+                                                    style: TextStyle(fontSize: 12, color: Colors.black87),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          SizedBox(height: 4),
+                                          InkWell(
+                                            onTap: order.mobile != null ? () async {
+                                              final url = 'tel:${order.mobile}';
+                                              if (await canLaunch(url)) {
+                                                await launch(url);
+                                              }
+                                            } : null,
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.phone_outlined, size: 14, color: Colors.teal),
+                                                SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    order.mobile ?? 'N/A',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: order.mobile != null ? Colors.teal : Colors.black87,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          SizedBox(height: 4),
+                                          InkWell(
+                                            onTap: order.email != null ? () async {
+                                              final url = 'mailto:${order.email}';
+                                              if (await canLaunch(url)) {
+                                                await launch(url);
+                                              }
+                                            } : null,
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.email_outlined, size: 14, color: Colors.teal),
+                                                SizedBox(width: 6),
+                                                Expanded(
+                                                  child: Text(
+                                                    order.email ?? 'N/A',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: order.email != null ? Colors.teal : Colors.black87,
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Container(
+                                      height: 50,
+                                      width: 1,
+                                      margin: EdgeInsets.symmetric(horizontal: 12),
+                                      color: Colors.teal.withOpacity(0.2),
+                                    ),
+                        Expanded(
+                          child: Container(
+                            padding: EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                            decoration: BoxDecoration(
+                              color: (double.parse(order.credit_limit!) != null && double.parse(order.credit_limit!) > (order.totalBalance ?? 0))
+                                ? Colors.red.withOpacity(0.1):
+                              Colors.teal.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'Balance',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  '₹${order.totalBalance?.toStringAsFixed(2) ?? '0.00'}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: (double.parse(order.credit_limit!) != null && double.parse(order.credit_limit!) > (order.totalBalance ?? 0))
+                                        ? Colors.red // Set to red if credit limit is greater than balance
+                                        : Colors.teal, // Otherwise, keep teal
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -283,17 +470,151 @@ class _OutStandingListState extends State<OutStandingList> {
     );
   }
 
+
+
+  Future<void> sharePdf(Party party) async {
+    print("Starting PDF generation and sharing process...");
+
+    try {
+      // Generate the PDF data with party-specific details
+      List<InvoiceData> invoiceDataList = [];
+
+        // Create a list of Invoice items if needed
+        List<Invoice> invoices = party.receivableData.map((invoice) => Invoice(
+          prefix: invoice.prefix,
+          invNo: invoice.invNo.toString(),
+          invDate:  DateFormat('dd-MM-yyyy').format(invoice.invDate),
+          dueDate: DateFormat('dd-MM-yyyy').format(invoice.dueDate),
+          pm: invoice.paymentMethod,
+          invAmt: invoice.invAmt,
+          cnAmt: invoice.cnAmt,
+          recvAmt: invoice.recdAmt,
+          balance: invoice.balance,
+          salesman: invoice.salesman,
+        )).toList();
+
+        // Create an InvoiceData instance for each order
+        InvoiceData invoiceData = InvoiceData(
+          disName: party.partyName,
+          disPartyCode: party.partyCode,
+          disArea: party.area,
+          disCity: party.city,
+          disMobile: party.mobile,
+          disEmail: party.email,
+          retName: party.partyName,
+          retPartyCode: party.partyCode,  // Assuming `partyCode` is available in `order`
+          retArea: party.area,
+          retCity: party.city,
+          retMobile: party.mobile,
+          retEmail: party.email,
+          invoices: invoices,
+          totalBalance: party.totalBalance, // Assuming `totalBalance` is part of each order
+        );
+
+        // Add to the list
+        invoiceDataList.add(invoiceData);
+
+
+      print("Generating PDF...");
+      final pdfData = await PdfGenerator.generatePdf(invoiceDataList);
+      print("PDF generated successfully.");
+
+      // Save the PDF to a temporary file
+      print("Saving PDF to temporary file...");
+      final directory = await getTemporaryDirectory();
+      final filePath = '${directory.path}/outstanding_distributor.pdf';
+      final file = File(filePath);
+      await file.writeAsBytes(pdfData);
+      print("PDF saved at $filePath");
+
+      // Open the PDF for preview
+      print("Opening PDF for preview...");
+      await OpenFile.open(filePath);
+
+      // Prompt user for sharing after preview
+      print("Attempting to share the PDF...");
+      final result = await Share.shareXFiles(
+        [XFile(filePath)],
+        subject: 'Outstanding Distributor - ${party.partyName}',
+        text: 'Check out the outstanding distributor details for ${party.partyName}!',
+      );
+
+      // Check the result of the share operation
+      if (result.status == ShareResultStatus.success) {
+        print("PDF shared successfully.");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF shared successfully!'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      } else {
+        print("PDF sharing was dismissed or failed.");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share PDF.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('An error occurred during PDF generation or sharing: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred: $e'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    bool isPhoneField = label.toLowerCase().contains('phone');
+
+    Future<void> launchPhoneCall(String phoneNumber) async {
+      // Clean the phone number
+      phoneNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+
+      if (phoneNumber == 'N/A' || phoneNumber.isEmpty) {
+        return;
+      }
+
+      if (await Permission.phone.request().isGranted) {
+        try {
+          final Uri phoneUri = Uri.parse('tel:$phoneNumber');
+          if (await launcher.canLaunchUrl(phoneUri)) {
+            await launcher.launchUrl(phoneUri);
+          }
+        } catch (e) {
+          debugPrint('Error launching phone dialer: $e');
+        }
+      }
+    }
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2), // Compact spacing
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.teal), // Slightly smaller icon
-          SizedBox(width: 4), // Adjusted spacing
+          Icon(icon, size: 18, color: Colors.teal),
+          const SizedBox(width: 4),
           Expanded(
-            child: Text(
-              '$value',
-              style: TextStyle(fontSize: 13), // Smaller font size for compactness
+            child: isPhoneField && value != 'N/A'
+                ? InkWell(
+              onTap: () => launchPhoneCall(value),
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.blue, // Makes it look clickable
+                  decoration: TextDecoration.underline,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            )
+                : Text(
+              value,
+              style: const TextStyle(fontSize: 13),
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -301,7 +622,6 @@ class _OutStandingListState extends State<OutStandingList> {
       ),
     );
   }
-
   void _showOrderDetailsBottomSheet(BuildContext context, List<ReceivableData> orders) {
     double previousAmount = 0.0;
     DateTime? _startDate;
@@ -376,6 +696,7 @@ class _OutStandingListState extends State<OutStandingList> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Header with Exit Icon
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -914,7 +1235,12 @@ class _OutStandingListState extends State<OutStandingList> {
               decoration: InputDecoration(
                 labelText: 'Search Orders',
                 border: OutlineInputBorder(),
-
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    searchController.clear(); // Clears the text in the TextField
+                  },
+                ),
               ),
               onChanged: (value) {
                fetchOutStandingList();
@@ -1011,6 +1337,67 @@ class _OutStandingListState extends State<OutStandingList> {
       });
     }
   }
-
-
 }
+
+class InvoiceData {
+  final String disName;
+  final String disPartyCode;
+  final String? disArea;
+  final String? disCity;
+  final String? disMobile;
+  final String? disEmail;
+
+  late final String retName;
+  final String retPartyCode;
+  final String? retArea;
+  final String? retCity;
+  final String? retMobile;
+  final String? retEmail;
+
+  final List<Invoice> invoices;
+  final double totalBalance;
+
+  InvoiceData({
+    required this.disName,
+    required this.disPartyCode,
+    this.disArea,
+    this.disCity,
+    this.disMobile,
+    this.disEmail,
+    required this.retName,
+    required this.retPartyCode,
+    this.retArea,
+    this.retCity,
+    this.retMobile,
+    this.retEmail,
+    required this.invoices,
+    required this.totalBalance,
+  });
+}
+
+class Invoice {
+  final String prefix;
+  final String invNo;
+  final String invDate;
+  final String dueDate;
+  final String pm;  // Payment method
+  final double invAmt;
+  final double cnAmt;   // Credit note amount
+  final double recvAmt; // Received amount
+  final double balance; // Outstanding balance
+  final String salesman;
+
+  Invoice({
+    required this.prefix,
+    required this.invNo,
+    required this.invDate,
+    required this.dueDate,
+    required this.pm,
+    required this.invAmt,
+    required this.cnAmt,
+    required this.recvAmt,
+    required this.balance,
+    required this.salesman,
+  });
+}
+

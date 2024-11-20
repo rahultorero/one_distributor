@@ -102,7 +102,7 @@ class ProductList {
     itemDetailid = json['item_detailid'];
     ledidParty = json['ledid_party'];
     qty = json['qty'];
-    free = json['free'];
+    free = json['free'] ?? 0;
     schPercentage = json['sch_percentage'];
     rate = json['rate'];
     mrp = json['mrp'];

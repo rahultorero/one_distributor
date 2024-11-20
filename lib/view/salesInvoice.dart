@@ -337,6 +337,12 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
               decoration: InputDecoration(
                 labelText: 'Search Orders',
                 border: OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    searchController.clear(); // Clears the text in the TextField
+                  },
+                ),
               ),
             ),
           ),
@@ -587,15 +593,19 @@ class SalesInvoiceGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Adjust the tablet breakpoint to match your device
+    final isTablet = screenWidth >= 533;
+
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 2 : 1,
-          // Lower the childAspectRatio to increase the height of the card
-          childAspectRatio: 1.65, // Adjust this value to make the card taller
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          crossAxisCount: isTablet ? 2 : 1,
+          // Adjusted aspect ratio for better height control
+          childAspectRatio: isTablet ? 1.79 : 1.65,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
         ),
         itemCount: invoices.length,
         itemBuilder: (context, index) {
@@ -603,143 +613,208 @@ class SalesInvoiceGrid extends StatelessWidget {
           return GestureDetector(
             onTap: () => _showInvoiceDetails(context, invoice),
             child: Card(
-              elevation: 4,
+              elevation: 2,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
                 side: BorderSide(color: Colors.grey.shade200),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start, // Align items to start
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                   width: 240,
-                                    child: Text(
-                                      invoice.partyname ?? 'N/A',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                        color: Color(0xFF2D3748),
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Spacer(),
-                                  _buildStatusWidget(invoice.barcode)
-                                ],
-                              ),
-                              SizedBox(height: 5,),
-                              Text(
-                                "${invoice.add1},${invoice.add2}" ?? 'N/A',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.normal,
-                                  fontSize: 13,
-                                  color: Color(0xFF2D3748),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              Text(
-                                "${invoice.area},${invoice.city}" ?? 'N/A',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.normal,
-                                  fontSize: 13,
-                                  color: Color(0xFF2D3748),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 7),
-
-                              // Row for Invoice Number and Date
-                              Row(
-                                children: [
-                                  // Use a Container or SizedBox to ensure proper width
-                                  Container(
-                                    width: MediaQuery.of(context).size.width / 2 - 12, // Adjust width as needed
-                                    child: _buildInfoText('INV NO', '${invoice.prefix}/${invoice.invno ?? 'N/A'}'),
-                                  ),
-                                  Spacer(),
-                                  const SizedBox(width: 12), // Reduced spacing
-                                  Container(
-
-                                    child: _buildInfoText('DATE', formatDateFromString(invoice.invdate) ?? 'N/A'),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-
-                              // Row for Order Number and Order Date
-                              Row(
-                                children: [
-                                  // Use a Container or SizedBox to ensure proper width
-                                  Container(
-                                    width: MediaQuery.of(context).size.width / 2 - 12, // Adjust width as needed
-                                    child: _buildInfoText('ORDER NO', invoice.orderno ?? 'N/A'),
-                                  ),
-                                  Spacer(),
-                                  const SizedBox(width: 12), // Reduced spacing
-                                  Container(
-
-                                    child: _buildInfoText('DATE', formatDateFromString(invoice.orderdate) ?? 'N/A'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 24, thickness: 1),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildAmountText('INV AMT', invoice.invamt, Colors.blue.shade700),
-
-                            ],
-                          ),
-                        ),
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-
-                              _buildRECDAmountText('ADJ AMT', invoice.recdamt+invoice.cnamt, Colors.green.shade700),
-                            ],
-                          ),
-                        ),
-                        Flexible(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-
-                              _buildBalanceText('BALANCE', invoice.balance, Colors.red.shade700),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+              // Adding gradient background to the card
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.white,
+                      Colors.grey.shade50,
+                    ],
+                  ),
                 ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        invoice.partyname ?? 'N/A',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: isTablet ? 14 : 16,
+                                          color: const Color(0xFF2D3748),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _buildStatusWidget(invoice.barcode)
+                                  ],
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  "${invoice.add1},${invoice.add2}" ?? 'N/A',
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 12 : 13,
+                                    color: const Color(0xFF2D3748),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  "${invoice.area},${invoice.city}" ?? 'N/A',
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 12 : 13,
+                                    color: const Color(0xFF2D3748),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 7),
 
+                                LayoutBuilder(
+                                  builder: (context, constraints) {
+                                    final maxWidth = constraints.maxWidth;
+                                    return Column(
+                                      children: [
+                                        Row(
+                                          children: [
+                                            SizedBox(
+                                              width: maxWidth * 0.48,
+                                              child: _buildInfoText('INV NO', '${invoice.prefix}/${invoice.invno ?? 'N/A'}', isTablet),
+                                            ),
+                                            const Spacer(),
+                                            SizedBox(
+                                              width: maxWidth * 0.48,
+                                              child: _buildInfoText('DATE', formatDateFromString(invoice.invdate) ?? 'N/A', isTablet),
+                                            ),
+                                          ],
+                                        ),
+                                        Row(
+                                          children: [
+                                            SizedBox(
+                                              width: maxWidth * 0.48,
+                                              child: _buildInfoText('ORDER NO', invoice.orderno ?? 'N/A', isTablet),
+                                            ),
+                                            const Spacer(),
+                                            SizedBox(
+                                              width: maxWidth * 0.48,
+                                              child: _buildInfoText('DATE', formatDateFromString(invoice.orderdate) ?? 'N/A', isTablet),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 20, thickness: 1),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 6 : 8,
+                                  vertical: isTablet ? 4 : 6
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.blue.shade50,
+                                    Colors.blue.shade100,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.blue.shade100.withOpacity(0.5),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: _buildAmountText('INV AMT', invoice.invamt, Colors.blue.shade700, isTablet),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 6 : 8,
+                                  vertical: isTablet ? 4 : 6
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.green.shade50,
+                                    Colors.green.shade100,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.green.shade100.withOpacity(0.5),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: _buildRECDAmountText('ADJ AMT', invoice.recdamt+invoice.cnamt, Colors.green.shade700, isTablet),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 6 : 8,
+                                  vertical: isTablet ? 4 : 6
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.red.shade50,
+                                    Colors.red.shade100,
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.red.shade100.withOpacity(0.5),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: _buildBalanceText('BALANCE', invoice.balance, Colors.red.shade700, isTablet),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           );
@@ -748,13 +823,15 @@ class SalesInvoiceGrid extends StatelessWidget {
     );
   }
 
-
-  Widget _buildInfoText(String label, String value) {
+  Widget _buildInfoText(String label, String value, bool isTablet) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: RichText(
         text: TextSpan(
-          style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
+          style: TextStyle(
+              fontSize: isTablet ? 11 : 13,
+              color: Colors.grey.shade800
+          ),
           children: [
             TextSpan(
               text: '$label: ',
@@ -767,34 +844,16 @@ class SalesInvoiceGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildAmountText(String label, dynamic amount, Color color) {
-    // Handle the amount formatting
-    String formattedAmount = 'N/A';
-    if (amount != null) {
-      try {
-        if (amount is String) {
-          // Try to parse the string to a number for proper formatting
-          final numAmount = double.tryParse(amount);
-          if (numAmount != null) {
-            formattedAmount = '₹${numAmount.toStringAsFixed(2)}';
-          } else {
-            formattedAmount = '₹$amount';
-          }
-        } else if (amount is num) {
-          formattedAmount = '₹${amount.toStringAsFixed(2)}';
-        }
-      } catch (e) {
-        formattedAmount = '₹$amount';
-      }
-    }
-
+  // Update the amount text builders to include isTablet parameter
+  Widget _buildAmountText(String label, dynamic amount, Color color, bool isTablet) {
+    String formattedAmount = _formatAmount(amount);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: isTablet ? 11 : 12,
             color: Colors.grey.shade600,
             fontWeight: FontWeight.w500,
           ),
@@ -803,7 +862,7 @@ class SalesInvoiceGrid extends StatelessWidget {
         Text(
           formattedAmount,
           style: TextStyle(
-            fontSize: 15,
+            fontSize: isTablet ? 13 : 15,
             color: color,
             fontWeight: FontWeight.w600,
           ),
@@ -812,34 +871,15 @@ class SalesInvoiceGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildBalanceText(String label, dynamic amount, Color color) {
-    // Handle the amount formatting
-    String formattedAmount = 'N/A';
-    if (amount != null) {
-      try {
-        if (amount is String) {
-          // Try to parse the string to a number for proper formatting
-          final numAmount = double.tryParse(amount);
-          if (numAmount != null) {
-            formattedAmount = '₹${numAmount.toStringAsFixed(2)}';
-          } else {
-            formattedAmount = '₹$amount';
-          }
-        } else if (amount is num) {
-          formattedAmount = '₹${amount.toStringAsFixed(2)}';
-        }
-      } catch (e) {
-        formattedAmount = '₹$amount';
-      }
-    }
-
+  Widget _buildBalanceText(String label, dynamic amount, Color color, bool isTablet) {
+    String formattedAmount = _formatAmount(amount);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: isTablet ? 11 : 12,
             color: Colors.grey.shade600,
             fontWeight: FontWeight.w500,
           ),
@@ -848,7 +888,7 @@ class SalesInvoiceGrid extends StatelessWidget {
         Text(
           formattedAmount,
           style: TextStyle(
-            fontSize: 15,
+            fontSize: isTablet ? 13 : 15,
             color: color,
             fontWeight: FontWeight.w600,
           ),
@@ -857,34 +897,15 @@ class SalesInvoiceGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildRECDAmountText(String label, dynamic amount, Color color) {
-    // Handle the amount formatting
-    String formattedAmount = 'N/A';
-    if (amount != null) {
-      try {
-        if (amount is String) {
-          // Try to parse the string to a number for proper formatting
-          final numAmount = double.tryParse(amount);
-          if (numAmount != null) {
-            formattedAmount = '₹${numAmount.toStringAsFixed(2)}';
-          } else {
-            formattedAmount = '₹$amount';
-          }
-        } else if (amount is num) {
-          formattedAmount = '₹${amount.toStringAsFixed(2)}';
-        }
-      } catch (e) {
-        formattedAmount = '₹$amount';
-      }
-    }
-
+  Widget _buildRECDAmountText(String label, dynamic amount, Color color, bool isTablet) {
+    String formattedAmount = _formatAmount(amount);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: isTablet ? 11 : 12,
             color: Colors.grey.shade600,
             fontWeight: FontWeight.w500,
           ),
@@ -893,13 +914,28 @@ class SalesInvoiceGrid extends StatelessWidget {
         Text(
           formattedAmount,
           style: TextStyle(
-            fontSize: 15,
+            fontSize: isTablet ? 13 : 15,
             color: color,
             fontWeight: FontWeight.w600,
           ),
         ),
       ],
     );
+  }
+
+  String _formatAmount(dynamic amount) {
+    if (amount == null) return 'N/A';
+    try {
+      if (amount is String) {
+        final numAmount = double.tryParse(amount);
+        return numAmount != null ? '₹${numAmount.toStringAsFixed(2)}' : '₹$amount';
+      } else if (amount is num) {
+        return '₹${amount.toStringAsFixed(2)}';
+      }
+      return '₹$amount';
+    } catch (e) {
+      return '₹$amount';
+    }
   }
 
 
@@ -942,7 +978,7 @@ class SalesInvoiceGrid extends StatelessWidget {
       case 'GDWOT':  // Goods Out
         return Colors.teal;
       case 'NOPRINT': // Not Printed
-        return Colors.grey;
+        return Colors.red;
       case 'DCONF':  // Delivery Confirmed
         return Colors.green;
       case 'DELIV':  // Delivered
@@ -998,6 +1034,8 @@ class SalesInvoiceGrid extends StatelessWidget {
       case 'PENDING':
         return Colors.orange;
       case 'NOPRINT': // Not Printed
+        return Colors.red;
+
       case 'NOT UPLOADED':
         return Colors.grey;
       case 'FAILED':
@@ -1108,12 +1146,11 @@ class InvoiceDetailsBottomSheet extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Party Name with Ellipsis if it's too long
                     Expanded(
                       child: Text(
                         invoice.partyname ?? 'N/A',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis, // Show dots if text is too long
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     IconButton(
@@ -1142,41 +1179,16 @@ class InvoiceDetailsBottomSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      color: RiveAppTheme.background, // Change this to your desired color
+                      color: RiveAppTheme.background,
                       child: Padding(
                         padding: const EdgeInsets.all(12.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    "${product?.pname} (${product?.packUnit}${product?.packageUnit})" ?? 'N/A',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '₹${product?.mrp.toStringAsFixed(2)}',
-                                      style: TextStyle(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Rate: ₹${product?.rate?.toStringAsFixed(2) ?? 'N/A'}',
-                                      style: TextStyle(color: Colors.grey[600]),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            Text(
+                              "${product?.pname} (${product?.packUnit}${product?.packageUnit})" ?? 'N/A',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             SizedBox(height: 12),
                             Container(
@@ -1199,6 +1211,73 @@ class InvoiceDetailsBottomSheet extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            SizedBox(height: 12),
+                            // New pricing info container
+                            Container(
+                              padding: EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                children: [
+                                  Column(
+                                    children: [
+                                      Text(
+                                        'MRP',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        '₹${product?.mrp.toStringAsFixed(2)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Column(
+                                    children: [
+                                      Text(
+                                        'Rate',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        '₹${product?.rate?.toStringAsFixed(2) ?? 'N/A'}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Column(
+                                    children: [
+                                      Text(
+                                        'Amount',
+                                        style: TextStyle(
+                                          color: Colors.grey[600],
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        '₹${(product?.qty ?? 0) * (product?.rate ?? 0)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1213,7 +1292,6 @@ class InvoiceDetailsBottomSheet extends StatelessWidget {
     );
   }
 
-
   Widget _buildInfoColumn(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
@@ -1227,4 +1305,3 @@ class InvoiceDetailsBottomSheet extends StatelessWidget {
     );
   }
 }
-

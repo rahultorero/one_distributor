@@ -2,44 +2,44 @@ import 'dart:convert';
 
 import 'package:distributers_app/components/LoadingIndicator.dart';
 import 'package:distributers_app/dataModels/MatchProductRes.dart';
+import 'package:distributers_app/dataModels/MatchingPartyRes.dart';
 import 'package:distributers_app/dataModels/UnmatchedProductRes.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../dataModels/StoreModel.dart';
+import '../dataModels/UnmatchingPartyRes.dart';
 import '../services/api_services.dart';
 import 'package:http/http.dart' as http;
 
 class ProductCardState {
   String selectedValue;
-  String selectedCode;
-  String selectedGeneric;
-  String selectedMfg;
-  MatchProduct? selectedMatchProduct;  // Add this to track selected match product
-  MatchProduct? selectedUnmatchProduct;  // Add this to track selected unmatch product
+  String selectedEmail;
+  String selectedPhone;
+  MatchParty? selectedMatchProduct;  // Add this to track selected match product
+  MatchParty? selectedUnmatchProduct;  // Add this to track selected unmatch product
 
   ProductCardState({
     this.selectedValue = "",
-    this.selectedCode = "",
-    this.selectedGeneric = "",
-    this.selectedMfg = "",
+    this.selectedEmail = "",
+    this.selectedPhone = "",
     this.selectedMatchProduct,
     this.selectedUnmatchProduct,
   });
 }
 
-class ProductMappingScreen extends StatefulWidget {
-  const ProductMappingScreen({Key? key}) : super(key: key);
+class UnmappedRetailerScreen extends StatefulWidget {
+  const UnmappedRetailerScreen({Key? key}) : super(key: key);
 
   @override
-  _ProductMappingScreenState createState() => _ProductMappingScreenState();
+  _UnmappedRetailerScreenState createState() => _UnmappedRetailerScreenState();
 }
 
-class _ProductMappingScreenState extends State<ProductMappingScreen> {
-  List<MatchProductModel> products = []; // This will hold the fetched invoices
-  List<MatchProductModel> filteredProducts= []; // This will hold the fetched invoices
+class _UnmappedRetailerScreenState extends State<UnmappedRetailerScreen> {
+  List<MatchingParty> retailer = []; // This will hold the fetched invoices
+  List<MatchingParty> filteredRetailer= []; // This will hold the fetched invoices
   int totalRequest = 0;
-  List<UnMatchProductModel> unMatchedProducts = []; // This will hold the fetched invoices
+  List<UnmatchParty> unMatchedRetailer = []; // This will hold the fetched invoices
 
   final Map<int, ProductCardState> cardStates = {};
 
@@ -57,7 +57,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
   int? selectedCompanyId;
   bool isLoading = true; // To manage loading state
 
-  MatchProduct? _selectedProduct;
+  MatchParty? _selectedProduct;
 
   int? companyId;
   String dmfg = "";
@@ -65,28 +65,26 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
   int itemDetailId = 0;
   String packing = "";
   int pcode = 0;
-  String pmfg = "";
-  String pname = "";
+  int leditParty = 0;
+  String alCode = "";
   String regcode = "";
+  String type = "";
 
   // Define variables with prefix 'other' for each field in the "o_product" section
-  int? otherDmfgId;
-  int? otherPmfgId;
-  String otherPname = "";
-  int otherPid = 0;
-  String? otherACode ;
-  String otherDmfgName = "";
-  String otherPmfgName = "";
-  String? otherPacking = "";
-  String? otherGrpidGenName = "";
-  late MatchProductModel productModelS;
+  int? retailerId;
+  int? retailerRgId;
+  String retailerRegName = "";
+
+  String retailerCode = "";
+
+  late MatchingParty retailerModelS;
   String selectSuggest = "Select...";
   int _counter = 1;
   final TextEditingController _pageController = TextEditingController();
   ScrollController _scrollController = ScrollController();
   double _scrollPosition = 0.0;
-  MatchProduct unMatchProduct = MatchProduct();
-  List<MatchProductModel> mappedProducts = [];
+  MatchParty unMatchProduct = MatchParty();
+  List<MatchingParty> mappedProducts = [];
 
 
   @override
@@ -105,8 +103,8 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
     _isSearchVisible = false;
     _isDateRangeVisible = false;
 
-    for (var product in products) { // Assuming `products` is your product list
-      final itemDetailId = product.itemdetailid!;
+    for (var product in retailer) { // Assuming `products` is your product list
+      final itemDetailId = product.ledidParty!;
       if (cardStates[itemDetailId]?.selectedValue.isNotEmpty == true &&
           cardStates[itemDetailId]!.selectedValue != "Select..." &&
           !mappedProducts.contains(product)) {
@@ -135,7 +133,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
         stores = await fetchCompanies(regCode!);
         selectedCompanyId = stores[0].companyId;
         selectRegCode = stores[0].regCode;
-        await _fetchMapProduct("1");
+        await _fetchMapRetailer("1");
       }
     } catch (e) {
       // Handle any errors that occur during fetching
@@ -175,22 +173,21 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
   }
 
 
-  Future<void> _fetchMapProduct(String page) async {
-    String apiUrl = ApiConfig.reqMapProduct(); // Replace with actual API URL
-
+  Future<void> _fetchMapRetailer(String page) async {
+    String apiUrl = ApiConfig.reqMatchingParty();
 
     final body = jsonEncode({
       "reg_code": selectRegCode,
       "companyid": selectedCompanyId,
-      "pagenum":page,
-      "pagesize":50,
-      "userInput":matchSearchController.text
+      "pagenum": page,
+      "pagesize": 50,
+      "userInput": matchSearchController.text,
     });
 
-    print("check the bodies  $body");
+    print("Request body: $body");
 
     setState(() {
-      isLoading = true; // Set loading to true when the request starts
+      isLoading = true;
     });
 
     try {
@@ -202,55 +199,46 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
         body: body,
       );
 
-      // Print response status code and body for debugging
       print("Response status code: ${response.statusCode}");
       print("Response body: ${response.body}");
 
       if (response.statusCode == 200) {
-        // Decode the JSON response
         final jsonData = jsonDecode(response.body);
-        print("check the data $jsonData");
 
-        // Extract invoices from the 'data' key
-        final List<dynamic>? invoiceList = jsonData['data'];
-        int request = jsonData['totalProduct'];
-        if (invoiceList != null && invoiceList.isNotEmpty) {
+        final List<dynamic>? retailerList = jsonData['data'];
+        int request = jsonData['totalProduct'] ?? 0; // Safeguard against null
+
+        if (retailerList != null && retailerList.isNotEmpty) {
           setState(() {
-            products = invoiceList.map((json) => MatchProductModel.fromJson(json)).toList();
-            filteredProducts = products;
+            retailer = retailerList.map((json) => MatchingParty.fromJson(json)).toList();
+            filteredRetailer = retailer;
             totalRequest = request;
-            print("view the filter productt ${json.encode(filteredProducts) }");
-            productModelS = filteredProducts[0];
-
+            print("Filtered retailer list: ${json.encode(filteredRetailer)}");
+            retailerModelS = (filteredRetailer.isNotEmpty ? filteredRetailer[0] : null)!;
           });
         } else {
-
-          print('No invoices found in the response');
-          // Handle no data case, like showing a message in UI
+          print('No retailers found in the response');
         }
       } else {
-
-        throw Exception('Failed to load invoices: ${response.body}');
+        throw Exception('Failed to load data: ${response.body}');
       }
     } catch (e) {
       setState(() {
-        filteredProducts = [];
+        filteredRetailer = [];
       });
-
-      print('Error fetching productss: $e');
-      // Show an error message in the UI using a SnackBar
+      print('Error fetching retailers: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Something went wrong! Please try again later..')),
+        SnackBar(content: Text('Something went wrong! Please try again later.')),
       );
     } finally {
       setState(() {
-        isLoading = false; // Set loading to false when the request completes
+        isLoading = false;
       });
     }
   }
 
   Future<void> _fetchUnMapProduct() async {
-    String apiUrl = ApiConfig.reqUnMapProduct(); // Replace with actual API URL
+    String apiUrl = ApiConfig.reqUnmatchedParty(); // Replace with actual API URL
 
 
     final body = jsonEncode({
@@ -286,15 +274,15 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
 
         if (invoiceList != null && invoiceList.isNotEmpty) {
           setState(() {
-            unMatchedProducts = invoiceList.map((json) => UnMatchProductModel.fromJson(json)).toList();
+            unMatchedRetailer = invoiceList.map((json) => UnmatchParty.fromJson(json)).toList();
           });
         } else {
-          unMatchedProducts.clear();
+          unMatchedRetailer.clear();
           print('No invoices found in the response');
           // Handle no data case, like showing a message in UI
         }
       } else {
-        unMatchedProducts.clear();
+        unMatchedRetailer.clear();
         throw Exception('Failed to load invoices: ${response.body}');
       }
     } catch (e) {
@@ -306,35 +294,27 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
     }
   }
 
-  Future<void> _mappedProduct() async {
+  Future<void> _mappedRetailer() async {
     final prefs = await SharedPreferences.getInstance();
-    String apiUrl = ApiConfig.postMapProduct(); // Replace with actual API URL
+    String apiUrl = ApiConfig.reqMappingParty(); // Replace with actual API URL
 
+    // Construct the request body
     final Map<String, dynamic> requestBody = {
-      "m_product": {
-        "pname": pname,
-        "regcode": regcode,
-        "packing": packing,
-        "itemdetailid": itemDetailId,
-        "companyid": companyId,
-        "dmfg": dmfg,
-        "pmfg": pmfg,
-        "generic": generic,
-        "pcode": pcode,
-      },
-      "o_product": {
-        "dmfgid": otherDmfgId,
-        "pmfgid": otherPmfgId,
-        "pname": otherPname,
-        "pid": otherPid,
-        "a_code": otherACode,
-        "dmfg_name": otherDmfgName,
-        "pmfg_name": otherPmfgName,
-        "packing": otherPacking,
-        "grpid_gen_name": otherGrpidGenName,
-      },
       "id": 0,
-      "cusrid": prefs.getInt("u_id"),
+      "party": {
+        "Regcode": regcode,
+        "Type": "CUST",
+        "LedId_Party": leditParty ?? 0, // Safeguard against null values
+        "CompanyId": companyId ?? 0,
+        "ALCode": alCode ?? "",
+      },
+      "retailer": {
+        "r_id": retailerId ?? 0,
+        "reg_name": retailerRegName ?? "",
+        "r_code": retailerCode ?? "",
+        "rg_id": retailerRgId ?? 0,
+      },
+      "cusrid": prefs.getInt("u_id") ?? 0, // Safeguard against null
       "eusrid": 0,
     };
 
@@ -363,32 +343,32 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Product Mapped..'),
+            content: Text('Party Mapped Successfully.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 2),
           ),
         );
 
         // Fetch new data and restore the scroll position after completion
-        await _fetchMapProduct(_counter.toString());
+        await _fetchMapRetailer(_counter.toString());
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _restoreScrollPosition();
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to Mapped'),
+            content: Text('Failed to Map Product'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 2),
           ),
         );
 
-        throw Exception('Failed to load invoices: ${response.body}');
+        throw Exception('Failed to map product: ${response.body}');
       }
     } catch (error) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Something went wrong'),
+          content: Text('Something went wrong! Please try again.'),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 2),
         ),
@@ -408,7 +388,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
       setState(() {
         _counter = newCounterValue; // Update _counter to match the text field's value
       });
-      _fetchMapProduct(_counter.toString()); // Call your function
+    _fetchMapRetailer(_counter.toString()); // Call your function
 
   }
 
@@ -418,7 +398,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
       _counter++; // Increase the counter
       _pageController.text = _counter.toString(); // Update the TextField
     });
-    _fetchMapProduct(_counter.toString());
+    _fetchMapRetailer(_counter.toString());
   }
 
   void _decreaseCounter() {
@@ -428,7 +408,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
         _pageController.text = _counter.toString(); // Update the TextField
       }
     });
-    _fetchMapProduct(_counter.toString());
+    _fetchMapRetailer(_counter.toString());
   }
 
   void _updateCounterFromTextField(String value) {
@@ -450,7 +430,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'MAPPING PRODUCTS',
+          'UNMAPPED RETAILER',
           style: TextStyle(
             fontSize: 15,
             fontWeight: FontWeight.w600,
@@ -478,7 +458,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
           ElevatedButton(
             onPressed: () {
               // Call the _mappedProduct() function to handle the mapping process
-              _mappedProduct();
+              _mappedRetailer();
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.lightGreen[200], // Light green background color
@@ -581,14 +561,14 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
                 ? Center(
               child: LoadingIndicator(),
             )
-                : filteredProducts.isEmpty
+                : filteredRetailer.isEmpty
                 ? Center(child: Text("No products available"))
                 : ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: filteredProducts.length,
+              itemCount: filteredRetailer.length,
               itemBuilder: (context, index) {
-                final product = filteredProducts[index];
+                final product = filteredRetailer[index];
                 return _buildProductCard(product);
               },
             ),
@@ -629,30 +609,29 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
     );
   }
 
-  Widget _buildProductCard(MatchProductModel product) {
+  Widget _buildProductCard(MatchingParty product) {
     // Initialize card state if not already done
-    cardStates[product.itemdetailid!] ??= ProductCardState();
+    cardStates[product.ledidParty!] ??= ProductCardState();
 
     // Only set default values if no selection has been made
-    if (cardStates[product.itemdetailid!]!.selectedValue.isEmpty &&
-        product.matchProduct != null &&
-        product.matchProduct!.isNotEmpty) {
-      final firstProduct = product.matchProduct!.first;
-      cardStates[product.itemdetailid!] = ProductCardState(
-        selectedValue: firstProduct.pname ?? "",
-        selectedCode: firstProduct.pid.toString(),
-        selectedGeneric: firstProduct.grpidGenName ?? "",
-        selectedMfg: firstProduct.pmfgName ?? "",
+    if (cardStates[product.ledidParty!]!.selectedValue.isEmpty &&
+        product.matchParty != null &&
+        product.matchParty!.isNotEmpty) {
+      final firstProduct = product.matchParty!.first;
+      cardStates[product.ledidParty!] = ProductCardState(
+        selectedValue: firstProduct.regName ?? "",
+        selectedEmail: "",
+        selectedPhone:  "",
         selectedMatchProduct: firstProduct,
       );
     }
 
-    final bool hasSelectedValue = cardStates[product.itemdetailid!]!.selectedValue.isNotEmpty &&
-        cardStates[product.itemdetailid!]!.selectedValue != "Select...";
+    final bool hasSelectedValue = cardStates[product.ledidParty!]!.selectedValue.isNotEmpty &&
+        cardStates[product.ledidParty!]!.selectedValue != "Select...";
 
     if (hasSelectedValue) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mappedProducts.any((mappedProduct) => mappedProduct.itemdetailid == product.itemdetailid)) {
+        if (!mappedProducts.any((mappedProduct) => mappedProduct.ledidParty == product.ledidParty)) {
           setState(() {
             mappedProducts.add(product);
           });
@@ -660,7 +639,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
       });
     }
 
-    print("Mapped Products: ${mappedProducts.map((e) => e.pname).toList()}");
+    print("Mapped Products: ${mappedProducts.map((e) => e.partyname).toList()}");
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -682,7 +661,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "${product.pname} ${product.packing}" ?? '',
+              "${product.partyname}" ?? '',
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -690,25 +669,22 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            _buildInfoRow('MFG:', '${product.pmfg ?? ''}'),
+            _buildInfoRow('Email:', '${product.email ?? ''}'),
             const SizedBox(height: 4),
-            _buildInfoRow('Code:', '${product.pcode ?? ''}'),
+            _buildInfoRow('Phone:', '${product.mobileno ?? ''}'),
             const SizedBox(height: 4),
-            _buildInfoRow('Generic:', '${product.generic ?? ''} '),
-            const SizedBox(height: 12),
             _buildMappingDropdown(
-              "Suggested Products",
-              product.matchProduct!,
-              _getDefaultOrSelectedProduct(product, cardStates[product.itemdetailid!]!),
+              "Suggested Retailer",
+              product.matchParty!,
+              _getDefaultOrSelectedProduct(product, cardStates[product.ledidParty!]!),
                   (selectedProduct) {
                 setState(() {
-                  cardStates[product.itemdetailid!] = ProductCardState(
-                    selectedValue: selectedProduct.pname ?? "",
-                    selectedCode: selectedProduct.pid.toString(),
-                    selectedGeneric: selectedProduct.grpidGenName ?? "",
-                    selectedMfg: selectedProduct.pmfgName ?? "",
+                  cardStates[product.ledidParty!] = ProductCardState(
+                    selectedValue: selectedProduct.regName ?? "",
+                    selectedEmail: selectedProduct.city ?? "",
+                    selectedPhone: selectedProduct.area ?? "",
                     selectedMatchProduct: selectedProduct,
-                    selectedUnmatchProduct: cardStates[product.itemdetailid!]!.selectedUnmatchProduct,
+                    selectedUnmatchProduct: cardStates[product.ledidParty!]!.selectedUnmatchProduct,
                   );
                   _selectedProduct = selectedProduct;
                   _updateOtherFields(selectedProduct);
@@ -717,18 +693,17 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
             ),
             const SizedBox(height: 12),
             _buildUnmatchedDropdown(
-              'Search from all Products',
-              cardStates[product.itemdetailid!]!.selectedValue,
-              product.itemdetailid!,
-              cardStates[product.itemdetailid!]!.selectedUnmatchProduct,
+              'Search from all Retailer',
+              cardStates[product.ledidParty!]!.selectedValue,
+              product.ledidParty!,
+              cardStates[product.ledidParty!]!.selectedUnmatchProduct,
                   (selectedProduct) {
                 setState(() {
-                  cardStates[product.itemdetailid!] = ProductCardState(
-                    selectedValue: selectedProduct.pname ?? "",
-                    selectedCode: selectedProduct.pid.toString(),
-                    selectedGeneric: selectedProduct.grpidGenName ?? "",
-                    selectedMfg: selectedProduct.pmfgName ?? "",
-                    selectedMatchProduct: cardStates[product.itemdetailid!]!.selectedMatchProduct,
+                  cardStates[product.ledidParty!] = ProductCardState(
+                    selectedValue: selectedProduct.regName ?? "",
+                    selectedEmail: selectedProduct.city ?? "",
+                    selectedPhone: selectedProduct.area ?? "",
+                    selectedMatchProduct: cardStates[product.ledidParty!]!.selectedMatchProduct,
                     selectedUnmatchProduct: selectedProduct,
                   );
                   unMatchProduct = selectedProduct;
@@ -744,7 +719,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
     );
   }
 
-  Widget _buildPreviewSection(MatchProductModel product) {
+  Widget _buildPreviewSection(MatchingParty product) {
 
 
     // Only show the preview section if there's a selected product
@@ -771,11 +746,9 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _buildInfoRow('MFG:', cardStates[product.itemdetailid!]!.selectedMfg),
+                _buildInfoRow('Email:', cardStates[product.ledidParty!]!.selectedEmail),
                 const SizedBox(height: 4),
-                _buildInfoRow('Code:', cardStates[product.itemdetailid!]!.selectedCode),
-                const SizedBox(height: 4),
-                    _buildInfoRow('Generic:', cardStates[product.itemdetailid!]!.selectedGeneric),
+                _buildInfoRow('Phone:', cardStates[product.ledidParty!]!.selectedPhone),
               ],
             ),
           ),
@@ -786,7 +759,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
     );
   }
 
-  Widget _buildMappingActions(MatchProductModel product) {
+  Widget _buildMappingActions(MatchingParty product) {
     return Column(
       children: [
         _buildActionButton(
@@ -804,47 +777,47 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
     );
   }
 
-  MatchProduct _getDefaultOrSelectedProduct(MatchProductModel product, ProductCardState state) {
+  MatchParty _getDefaultOrSelectedProduct(MatchingParty product, ProductCardState state) {
 
     // First check if matchProduct list exists and is not empty
-    if (product.matchProduct == null || product.matchProduct!.isEmpty) {
+    if (product.matchParty == null || product.matchParty!.isEmpty) {
       // Return a default MatchProduct when no products are available
-      return MatchProduct(
-        pid: -1,  // or any default id you prefer
-        pname: "No products available",
-        pmfgName: "",
-        grpidGenName: "",
+      return MatchParty(
+        rId: -1,  // or any default id you prefer
+        regName: "No products available",
+        area: "",
+        city: "",
       );
     }
 
     // If there's a selected product, try to find it in the matchProduct list
     if (state.selectedMatchProduct != null) {
       try {
-        return product.matchProduct!.firstWhere(
-              (p) => p.pid == state.selectedMatchProduct!.pid,
-          orElse: () => product.matchProduct!.first,
+        return product.matchParty!.firstWhere(
+              (p) => p.rId == state.selectedMatchProduct!.rId,
+          orElse: () => product.matchParty!.first,
         );
       } catch (e) {
         // If anything goes wrong, safely return the first product
-        return product.matchProduct!.first;
+        return product.matchParty!.first;
       }
     }
 
     // If no selection but we have products, return the first product
-    return product.matchProduct!.first;
+    return product.matchParty!.first;
   }
 
   Widget _buildMappingDropdown(
       String label,
-      List<MatchProduct> items,
-      MatchProduct selectedValue,
-      ValueChanged<MatchProduct> onChanged,
+      List<MatchParty> items,
+      MatchParty selectedValue,
+      ValueChanged<MatchParty> onChanged,
       ) {
     // Make sure items is not empty before trying to find matching value
-    MatchProduct matchingValue;
+    MatchParty matchingValue;
     try {
       matchingValue = items.firstWhere(
-            (item) => item.pid == selectedValue.pid,
+            (item) => item.rId == selectedValue.rId,
         orElse: () => items.first,
       );
     } catch (e) {
@@ -853,11 +826,13 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
         matchingValue = items.first;
       } else {
         // Handle the empty case appropriately, maybe set a default value or handle the error
-        matchingValue = MatchProduct(
-          pid: -1,  // or any default id you prefer
-          pname: "No products available",
-          pmfgName: "",
-          grpidGenName: "",
+        matchingValue = MatchParty(
+          rId: -1,  // or any default id you prefer
+          area: "",
+          city: "",
+          state: "",
+          rCode: "",
+          regName: ""
         );
       }
     }
@@ -882,7 +857,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
             borderRadius: BorderRadius.circular(6),
           ),
           child: DropdownButtonHideUnderline(
-            child: DropdownButton<MatchProduct>(
+            child: DropdownButton<MatchParty>(
               isExpanded: true,
               value: matchingValue,
               hint: Text(
@@ -896,11 +871,11 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
                 Icons.arrow_drop_down,
                 color: Colors.grey[600],
               ),
-              items: items.map((MatchProduct item) {
-                return DropdownMenuItem<MatchProduct>(
+              items: items.map((MatchParty item) {
+                return DropdownMenuItem<MatchParty>(
                   value: item,
                   child: Text(
-                    item.pname ?? "",
+                    item.regName ?? "",
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey[800],
@@ -908,7 +883,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
                   ),
                 );
               }).toList(),
-              onChanged: (MatchProduct? newValue) {
+              onChanged: (MatchParty? newValue) {
                 if (newValue != null) {
                   onChanged(newValue);
                 }
@@ -924,8 +899,8 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
       String label,
       String displayValue,
       int productId,
-      MatchProduct? selectedValue,
-      ValueChanged<MatchProduct> onChanged,
+      MatchParty? selectedValue,
+      ValueChanged<MatchParty> onChanged,
       ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -951,7 +926,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    selectedValue?.pname ?? displayValue,
+                    selectedValue?.regName ?? displayValue,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey[800],
@@ -971,18 +946,12 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
   }
 
 
-  void _updateOtherFields(MatchProduct selectedProduct) {
-    otherDmfgId = selectedProduct.dmfgid;
-    otherPmfgId = selectedProduct.pmfgid;
-    otherPname = selectedProduct.pname!;
-    otherPid = selectedProduct.pid!;
-    otherACode = selectedProduct.aCode;
-    otherDmfgName = selectedProduct.dmfgName!;
-    otherPmfgName = selectedProduct.pmfgName!;
-    otherPacking = selectedProduct.packing ?? '';
-    otherGrpidGenName = selectedProduct.grpidGenName;
+  void _updateOtherFields(MatchParty selectedProduct) {
+    retailerCode = selectedProduct.rCode!;
+    retailerId = selectedProduct.rId;
+    retailerRegName = selectedProduct.regName!;
+    retailerRgId = 0;
 
-    print("updated other filesss ${otherPname}");
   }
 
   Widget _buildInfoRow(String label, String value) {
@@ -1018,19 +987,19 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
 
 
   void _openDialog(int productId) {
-    _showSelectionDialog((selectedValue, selectedCode, selectedGeneric, selectedMfg) {
+    _showSelectionDialog((selectedValue, selectedEmail, selectedPhone) {
       setState(() {
         cardStates[productId] = ProductCardState(
           selectedValue: selectedValue,
-          selectedCode: selectedCode,
-          selectedGeneric: selectedGeneric,
-          selectedMfg: selectedMfg,
+          selectedEmail: selectedEmail,
+          selectedPhone: selectedPhone,
+
         );
       });
     });
   }
 
-  void _showSelectionDialog(void Function(String, String, String, String) onItemSelected) {
+  void _showSelectionDialog(void Function(String, String, String) onItemSelected) {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1142,20 +1111,20 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
                             child: ListView.separated(
                               shrinkWrap: true,
                               padding: EdgeInsets.zero,
-                              itemCount: unMatchedProducts.length,
+                              itemCount: unMatchedRetailer.length,
                               separatorBuilder: (context, index) => Divider(height: 1),
                               itemBuilder: (context, index) {
-                                final product = unMatchedProducts[index];
+                                final retailer = unMatchedRetailer[index];
                                 return ListTile(
                                   title: Text(
-                                    "${product.pname!}${product.packing ?? ''}",
+                                    "${retailer.regName  ?? ""}",
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   subtitle: Text(
-                                    "${product.dmfgName ?? ''}",
+                                    "${retailer.rCode ?? ''}",
                                     style: TextStyle(
                                       fontSize: 12,
                                       color: Colors.grey.shade600,
@@ -1164,21 +1133,15 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
                                   onTap: () {
                                     // Pass selected values to parent callback and close the dialog
                                     onItemSelected(
-                                      product.pname ?? "",
-                                      product.pid.toString() ?? "",
-                                      product.grpidGenName ?? "",
-                                      product.pmfgName ?? "",
+                                      retailer.regName ?? "",
+                                      retailer.email ?? "",
+                                      retailer.mob ?? "",
                                     );
 
-                                    otherDmfgId = product.dmfgid ?? 0;
-                                    otherPmfgId = product.pmfgid;
-                                    otherPname = product.pname!;
-                                    otherPid = product.pid!;
-                                    otherACode = product.aCode;
-                                    otherDmfgName = product.dmfgName!;
-                                    otherPmfgName = product.pmfgName!;
-                                    otherPacking = product.packing ?? '';
-                                    otherGrpidGenName = product.grpidGenName;
+                                    retailerCode = retailer.rCode!;
+                                    retailerId = retailer.rId;
+                                    retailerRegName = retailer.regName!;
+                                    retailerRgId = 0;
                                     searchController.clear();
                                     Navigator.pop(context);
                                   },
@@ -1203,8 +1166,10 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
       searchController.clear();
     });
   }
-  Widget _buildActionButton({required IconData icon, required Color color,required MatchProductModel product}) {
+  Widget _buildActionButton({required IconData icon, required Color color,required MatchingParty product}) {
     return Container(
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color.withOpacity(0.1),
@@ -1213,16 +1178,11 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
         icon: Icon(icon, size: 24, color: color),
         onPressed: () {
           companyId = product.companyid;
-          dmfg = product.dmfg!;
-          generic = product.generic ?? "";
-          itemDetailId = product.itemdetailid!;
-          packing = product.packing ?? "";
-          pcode = product.pcode!;
-          pmfg = product.pmfg ?? "";
-          pname = product.pname ?? "";
-          regcode = product.regcode!;
-
-          _mappedProduct();
+          alCode = product.alcode ?? "";
+          type = product.type ?? "";
+          regcode = product.regcode ?? "";
+          leditParty = product.ledidParty ?? 0;
+          _mappedRetailer();
         },
       ),
     );
@@ -1280,7 +1240,7 @@ class _ProductMappingScreenState extends State<ProductMappingScreen> {
 
               ),
               onChanged: (value) {
-                _fetchMapProduct(_counter.toString());
+                _fetchMapRetailer(_counter.toString());
               },
             ),
           ),

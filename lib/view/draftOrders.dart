@@ -2,6 +2,7 @@ import 'package:distributers_app/components/LoadingIndicator.dart';
 import 'package:distributers_app/dataModels/DraftListRes.dart';
 import 'package:distributers_app/dataModels/OrderDetailsRes.dart';
 import 'package:distributers_app/services/api_services.dart';
+import 'package:distributers_app/view/draftSalesOrder.dart';
 import 'package:distributers_app/view/profileScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -14,6 +15,7 @@ import '../dataModels/OrderListRes.dart';
 import '../dataModels/StoreModel.dart';
 import '../theme.dart';
 import '../dataModels/StoreModel.dart';
+import 'newSalesOrder.dart';
 
 class DraftOrderList extends StatefulWidget {
   @override
@@ -186,6 +188,9 @@ class _DraftOrderListState extends State<DraftOrderList> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Adjust the tablet breakpoint to match your device
+    final isTablet = screenWidth >= 533;
     return Scaffold(
       appBar: AppBar(
         title: Text('Draft Orders'),
@@ -205,7 +210,9 @@ class _DraftOrderListState extends State<DraftOrderList> {
           IconButton(
             icon: Icon(Icons.add),
             onPressed: () {
-
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => NewSalesOrder()),
+              );
             },
           ),
 
@@ -250,15 +257,21 @@ class _DraftOrderListState extends State<DraftOrderList> {
                 ),
 
               )
-                  : ListView.builder(
+                  : GridView.builder(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isTablet ? 2 : 1,
+                // Lower the childAspectRatio to increase the height of the card
+                childAspectRatio: isTablet ? 2.16:1.87, // Adjust this value to make the card taller
+                crossAxisSpacing: 1,
+                mainAxisSpacing: 5,
+              ),
                 itemCount: filteredOrders.length,
                 itemBuilder: (context, index) {
                   final order = filteredOrders[index];
                   return InkWell(
                     onTap: () {
-
-
-
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => DraftSalesOrder(draftOrder: filteredOrders[index])),
+                      );
                     },
                     child: Card(
                       color: Colors.white,
@@ -289,7 +302,7 @@ class _DraftOrderListState extends State<DraftOrderList> {
                                     Container(
                                       width: 50,
                                       child: Text(
-                                        "(${order.partyCode})",
+                                        "(${order.ohid})",
                                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -359,6 +372,15 @@ class _DraftOrderListState extends State<DraftOrderList> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showOrderDetails(BuildContext context, DraftOrderRes order) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraftOrderBottomSheet(ocId: order.ohid!,orderId: order.orderNo,companyName: order.partyName,),
     );
   }
 
@@ -556,7 +578,14 @@ class _DraftOrderListState extends State<DraftOrderList> {
               decoration: InputDecoration(
                 labelText: 'Search Orders',
                 border: OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    searchController.clear(); // Clears the text in the TextField
+                  },
+                ),
               ),
+
             ),
           ),
         ),
@@ -670,3 +699,224 @@ class _DraftOrderListState extends State<DraftOrderList> {
 
 
 }
+
+
+class DraftOrderBottomSheet extends StatefulWidget {
+  final int ocId;
+  final String orderId;
+  final String companyName;
+  const DraftOrderBottomSheet({Key? key, required this.ocId, required this.orderId,required this.companyName}) : super(key: key);
+
+  @override
+  _OrderBottomSheetState createState() => _OrderBottomSheetState();
+}
+class _OrderBottomSheetState extends State<DraftOrderBottomSheet> {
+  OrderDetailsRes? orderDetails; // Nullable to handle loading state
+
+  @override
+  void initState() {
+    super.initState();
+    // Call the API when the widget is initialized
+    postOrderDetails();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.2,
+      maxChildSize: 0.95,
+      builder: (_, controller) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Top bar for dragging
+              Container(
+                padding: const EdgeInsets.all(10.0),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.3),
+                      spreadRadius: 1,
+                      blurRadius: 4, // Slightly increased blur for a softer shadow
+                      offset: Offset(0, 2), // Slightly adjusted offset for the shadow
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space between title and close button
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10.0), // Add left margin here
+                      child:
+                      Row(
+                        children: [
+                          Container(
+                            width:200,
+                            child:  Text(
+                              '${widget.companyName}', // Heading
+                              style: TextStyle(
+                                  fontSize: 15, // Font size for better visibility
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black, // Change the color if needed
+                                  overflow: TextOverflow.ellipsis                        ),
+                            ),
+                          ),
+
+                          Text(
+                            '(${widget.orderId})', // Heading
+                            style: TextStyle(
+                                fontSize: 14, // Font size for better visibility
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black, // Change the color if needed
+                                overflow: TextOverflow.ellipsis                        ),
+                          ),
+                        ],
+                      ),
+
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close, color: Colors.grey), // Close button icon
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close the bottom sheet
+                      },
+                    ),
+                  ],
+                ),
+
+              ),
+
+              Expanded(
+                child: orderDetails == null
+                    ? Center(child: LoadingIndicator()) // Show loading indicator
+                    : ListView.builder(
+                  controller: controller,
+                  padding: EdgeInsets.all(10),
+                  itemCount: orderDetails!.data.length, // Number of orders
+                  itemBuilder: (context, index) {
+                    final order = orderDetails!.data[index]; // Get each order
+                    return Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    "${order.productName} (${order.pcode}) -",
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '${order.packing}',
+                                      style: TextStyle(color: Colors.grey[600]),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 12),
+                            Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: IntrinsicHeight(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                  children: [
+
+                                    _buildInfoColumn('QTY', order.qty.toString()),
+                                    VerticalDivider(color: Colors.grey[300], thickness: 1),
+                                    _buildInfoColumn('Free', order.free.toString()),
+                                    VerticalDivider(color: Colors.grey[300], thickness: 1),
+                                    _buildInfoColumn('Rate', order.rate.toString()),
+                                    VerticalDivider(color: Colors.grey[300], thickness: 1),
+                                    _buildInfoColumn('Mrp', order.mrp.toString()),
+                                    VerticalDivider(color: Colors.grey[300], thickness: 1),
+                                    _buildInfoColumn('Amt', order.amount.toString()),
+
+
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> postOrderDetails() async {
+    String url = ApiConfig.reqOrderDetails(); // Replace with your API endpoint
+
+    // Prepare the body including 'ohid' and 'reg_code'
+    final body = {
+      'ohid': widget.ocId, // Use ocId as 'ohid'
+      'reg_code': 'D000004',
+    };
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        // Parse the response
+        final data = jsonDecode(response.body);
+        setState(() {
+          orderDetails = OrderDetailsRes.fromJson(data); // Update order details
+        });
+        print('Order details fetched successfully');
+      } else {
+        print('Failed to fetch order details. Status code: ${response.statusCode}');
+      }
+    } catch (error) {
+      print('Error occurred while fetching order details: $error');
+    }
+  }
+
+  Widget _buildInfoColumn(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+      child: Column(
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          SizedBox(height: 4),
+          Text(value, style: TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+

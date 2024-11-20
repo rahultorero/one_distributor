@@ -127,6 +127,12 @@ class _UsersListScreenState extends State<UsersListScreen> {
                   borderRadius: BorderRadius.circular(30),
                 ),
                 prefixIcon: Icon(Icons.search, color: Colors.grey),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    _searchController.clear(); // Clears the text in the TextField
+                  },
+                ),
               ),
             ),
           ),
@@ -137,144 +143,132 @@ class _UsersListScreenState extends State<UsersListScreen> {
               itemCount: _filteredUserList.length,
               itemBuilder: (context, index) {
                 final user = _filteredUserList[index];
-                double dragOffset = 0.0; // To track swipe offset
-                bool isEditingVisible = false; // To track edit button visibility
-
-                return StatefulBuilder(
-                  builder: (context, setState) {
-                    return GestureDetector(
-                      onHorizontalDragUpdate: (details) {
-                        // Update the drag offset based on the swipe
-                        dragOffset += details.delta.dx;
-                        dragOffset = dragOffset.clamp(-100.0, 0.0); // Limit drag offset
-                        setState(() {}); // Trigger rebuild to update position
-                      },
-                      onHorizontalDragEnd: (details) {
-                        // Determine if the edit button should be shown or hidden
-                        if (dragOffset < -50) {
-                          isEditingVisible = true; // Show the edit button
-                        } else {
-                          dragOffset = 0; // Reset drag offset
-                          isEditingVisible = false; // Hide the edit button
-                        }
-                        setState(() {}); // Trigger rebuild to update state
-                      },
-                      child: Stack(
-                        children: [
-                          // Edit button that matches card size
-                          AnimatedPositioned(
-                            duration: Duration(milliseconds: 200),
-                            right: isEditingVisible ? 0 : -100, // Position it off-screen when not visible
-                            child: GestureDetector(
-                              onTap: () {
-                                // Navigate to the edit screen
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (context) => AdminProfile(
-                                      u_id: user.uId,
-                                      username: user.duNo.toString(),
-                                    ),
-                                  ),
-                                );
-                                // Reset drag offset and hide button after navigation
-                                dragOffset = 0;
-                                isEditingVisible = false;
-                                setState(() {});
-                              },
-                              child: Container(
-                                width: 100,
-                                height: 75,
-                                decoration: BoxDecoration(
-                                  color: Colors.orange,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(15),
-                                    bottomLeft: Radius.circular(15),
-                                  ),
-                                ),
-                                alignment: Alignment.center,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.edit, color: Colors.white),
-                                    SizedBox(width: 5),
-                                    Text(
-                                      'Edit',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  child: Dismissible(
+                    key: Key(user.uId.toString()),
+                    direction: DismissDirection.endToStart,
+                    dismissThresholds: const {
+                      DismissDirection.endToStart: 0.3,
+                    },
+                    confirmDismiss: (direction) async {
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => AdminProfile(
+                            u_id: user.uId,
+                            username: user.duNo.toString(),
                           ),
-                          // Main content of the item
-                          Transform.translate(
-                            offset: Offset(dragOffset, 0),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                              child: Card(
-                                elevation: 5,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                                color: Colors.white,
-                                shadowColor: Colors.grey.withOpacity(0.5),
-                                child: ClipRect(
-                                  child: ExpansionTile(
-                                    leading: CircleAvatar(
-                                      radius: 30,
-                                      backgroundColor: Colors.orange.shade200,
-                                      child: Text(
-                                        user.userName.isNotEmpty
-                                            ? user.userName.toUpperCase()[0]
-                                            : 'U',
-                                        style: TextStyle(
-                                          fontSize: 22,
-                                          color: Colors.orange.shade800,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                    title: Text(
-                                      user.userName,
-                                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                                    ),
-                                    subtitle: Text(
-                                      user.email ?? 'No Email',
-                                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                                    ),
-                                    trailing: Switch(
-                                      value: user.isActive,
-                                      onChanged: (bool value) {
-                                        setState(() {
-                                          userList[index] = user.copyWith(isActive: value);
-                                        });
-                                      },
-                                      activeColor: Colors.orange,
-                                    ),
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(16),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            _buildInfoRow(Icons.code, 'Code', user.duNo ?? 'No Code'),
-                                            _buildInfoRow(Icons.cake, 'Date of Birth', formatDateFromString(user.dob) ?? 'No DOB'),
-                                            if (user.wad != null)
-                                              _buildInfoRow(Icons.favorite, 'Wedding Date', formatDateFromString(user.wad)),
-                                            _buildInfoRow(Icons.phone, 'Mobile No.', user.mobile),
-                                            if (user.salesmanName?.isNotEmpty ?? false)
-                                              _buildInfoRow(Icons.person, 'Salesman', user.salesmanName!),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                        ),
+                      );
+                      return false;
+                    },
+                    background: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: const [
+                          Icon(Icons.edit, color: Colors.white),
+                          SizedBox(width: 5),
+                          Text(
+                            'Edit',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
+                    ),
+                    child: Card(
+                      elevation: 5,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      color: Colors.white,
+                      shadowColor: Colors.grey.withOpacity(0.5),
+                      child: ExpansionTile(
+                        leading: CircleAvatar(
+                          radius: 30,
+                          backgroundColor: Colors.orange.shade200,
+                          child: Text(
+                            user.userName.isNotEmpty
+                                ? user.userName.toUpperCase()[0]
+                                : 'U',
+                            style: TextStyle(
+                              fontSize: 22,
+                              color: Colors.orange.shade800,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          user.userName,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        subtitle: Text(
+                          user.email ?? 'No Email',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                        trailing: Switch(
+                          value: user.isActive,
+                          onChanged: (bool value) {
+                            setState(() {
+                              userList[index] = user.copyWith(isActive: value);
+                            });
+                          },
+                          activeColor: Colors.orange,
+                        ),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildInfoRow(
+                                  Icons.code,
+                                  'Code',
+                                  user.duNo ?? 'No Code',
+                                ),
+                                _buildInfoRow(
+                                  Icons.cake,
+                                  'Date of Birth',
+                                  formatDateFromString(user.dob) ?? 'No DOB',
+                                ),
+                                if (user.wad != null)
+                                  _buildInfoRow(
+                                    Icons.favorite,
+                                    'Wedding Date',
+                                    formatDateFromString(user.wad),
+                                  ),
+                                _buildInfoRow(
+                                  Icons.phone,
+                                  'Mobile No.',
+                                  user.mobile,
+                                ),
+                                if (user.salesmanName?.isNotEmpty ?? false)
+                                  _buildInfoRow(
+                                    Icons.person,
+                                    'Salesman',
+                                    user.salesmanName!,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 );
               },
             ),
@@ -635,6 +629,11 @@ class _AddUserScreenState extends State<AddUserScreen> {
   Future<void> postSalesManData(int companyId, String regCode) async {
     final url = ApiConfig.reqSalesManList();
 
+    setState(() {
+      _isLoading = true;
+    });
+
+
     // Create the request body
     final Map<String, dynamic> requestBody = {
       'companyid': companyId,
@@ -676,263 +675,444 @@ class _AddUserScreenState extends State<AddUserScreen> {
           print('Unexpected data format: ${jsonResponse['data']}');
           print('Type of data: ${jsonResponse['data'].runtimeType}');
         }
+        setState(() {
+          _isLoading = false;
+        });
+
       } else {
         print('Failed to post SalesMan data. Status code: ${response.statusCode}');
         print('Error response: ${response.body}');
       }
     } catch (e) {
       print('Error posting SalesMan data: $e');
+    }finally{
+      setState(() {
+        _isLoading = false;
+      });
+
     }
   }
 
+  void _removeImage() {
+    setState(() {
+      _profileImage = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Add User'),
+        title: const Text(
+          'Add User',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: RiveAppTheme.background2,
+        elevation: 0,
+        centerTitle: true,
       ),
       body: _isLoading
-          ? Center(
-        child: LoadingIndicator(), // Loader while loading
-      )
-          : SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.black45,
-                    width: 2.0,
-                  ),
-                ),
-                child: CircleAvatar(
-                  radius: 45,
-                  backgroundColor: Colors.transparent,
-                  backgroundImage: _profileImage != null
-                      ? FileImage(_profileImage!)
-                      : (profilePic != null && profilePic!.isNotEmpty
-                      ? NetworkImage(profilePic!)
-                      : null),
-                  child: Stack(
-                    children: [
-                      if (_profileImage == null &&
-                          (profilePic == null || profilePic!.isEmpty))
-                        Align(
-                          alignment: Alignment.center,
-                          child: Icon(Icons.person, size: 40, color: Colors.black45),
-                        ),
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: CircleAvatar(
-                          radius: 15,
-                          backgroundColor: Colors.grey,
-                          child: IconButton(
-                            icon: Icon(Icons.camera_alt, size: 15, color: Colors.black),
-                            onPressed: _pickImage,
-                          ),
-                        ),
+          ? LoadingIndicator()
+          : Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.grey[50],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: RiveAppTheme.background2, width: 2),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            labelStyle: TextStyle(color: Colors.grey[600]),
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Profile Image Section
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: RiveAppTheme.background2.withOpacity(0.3),
+                      width: 3.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
-                ),
-              ),
+                  child: CircleAvatar(
+                    radius: 60,
+                    backgroundColor: Colors.grey[100],
+                    backgroundImage: _profileImage != null
+                        ? FileImage(_profileImage!)
+                        : (profilePic != null && profilePic!.isNotEmpty
+                        ? NetworkImage(profilePic!) as ImageProvider
+                        : null),
+                    child: Stack(
+                      children: [
+                        // Show placeholder icon if no image is selected
+                        if (_profileImage == null && (profilePic == null || profilePic!.isEmpty))
+                          const Align(
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.person,
+                              size: 40,  // Reduced size for the placeholder icon
+                              color: Colors.black26,
+                            ),
+                          ),
 
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _usernameController,
-                decoration: InputDecoration(
-                  labelText: 'User Name *',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) => value!.isEmpty ? 'Please enter a name' : null,
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _passwordController,
-                decoration: InputDecoration(
-                  labelText: 'User Password *',
-                  border: OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: Icon(_isPasswordVisible
-                        ? Icons.visibility
-                        : Icons.visibility_off,),
-                    onPressed: () {
-                      setState(() {
-                        _isPasswordVisible = !_isPasswordVisible;
-                      });
-                    },
-                  ),
-                ),
-                obscureText: !_isPasswordVisible,
-                validator: (value) => value!.isEmpty ? 'Please enter a password' : null,
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _mobileController,
-                decoration: InputDecoration(
-                  labelText: 'User Mobile *',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-                validator: (value) => value!.isEmpty ? 'Please enter a mobile number' : null,
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _emailController,
-                decoration: InputDecoration(
-                  labelText: 'Email *',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-                validator: (value) => value!.isEmpty ? 'Please enter an email' : null,
-              ),
-              SizedBox(height: 16),
-              DropdownButtonFormField<GenderOption>(
-                decoration: InputDecoration(
-                  labelText: 'Gender *',
-                  border: OutlineInputBorder(),
-                ),
-                value: _selectedGenderOption,
-                items: genderOptions.map((GenderOption genderOption) {
-                  return DropdownMenuItem<GenderOption>(
-                    value: genderOption,
-                    child: Text(genderOption.title),
-                  );
-                }).toList(),
-                onChanged: (GenderOption? newValue) {
-                  setState(() {
-                    _selectedGenderOption = newValue;
-                    _selectedFxdIdGen = newValue?.fxdIdGen;
-                    print(_selectedFxdIdGen);
-                  });
-                },
-                validator: (value) => value == null ? 'Please select a gender' : null,
-              ),
-              SizedBox(height: 16),
-              InkWell(
-                onTap: () => _selectDate(context, true),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Date Of Birth',
-                    border: OutlineInputBorder(),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      Text(_dateOfBirth == null ? 'Select Date' : '${_dateOfBirth!.day}-${_dateOfBirth!.month}-${_dateOfBirth!.year}'),
-                      Icon(Icons.calendar_today),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-              InkWell(
-                onTap: () => _selectDate(context, false),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: 'Date Of Marriage',
-                    border: OutlineInputBorder(),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      Text(_dateOfMarriage == null ? 'Select Date' : '${_dateOfMarriage!.day}-${_dateOfMarriage!.month}-${_dateOfMarriage!.year}'),
-                      Icon(Icons.calendar_today),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-              TextFormField(
-                controller: _welcomeNoteController,
-                decoration: InputDecoration(
-                  labelText: 'Welcome Note',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 2,
-              ),
-              SizedBox(height: 16),
-              DropdownButtonFormField<SalesManModel>(
-                decoration: InputDecoration(
-                  labelText: 'Select Salesman *',
-                  border: OutlineInputBorder(),
-                ),
-                value: _selectedSalesman,
-                items: salesmen.map((SalesManModel salesmanSelect) {
-                  return DropdownMenuItem<SalesManModel>(
-                    value: salesmanSelect,
-                    child: Text(salesmanSelect.sman!,style: TextStyle(fontSize: 13),),
-                  );
-                }).toList(),
-                onChanged: (SalesManModel? newValue) {
-                  setState(() {
-                    _selectedSalesman = newValue;
-                    _selectFXIdSales = newValue?.smanid;
-                    print(_selectFXIdSales);
-                  });
-                },
-                validator: (value) => value == null ? 'Please select a gender' : null,
-              ),
+                        // Display camera icon for selecting new image
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[800],
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.camera_alt,
+                                size: 16,  // Reduced camera icon size
+                                color: Colors.white,
+                              ),
+                              onPressed: _pickImage,
+                              constraints: const BoxConstraints(
+                                minWidth: 30,  // Reduced button size
+                                minHeight: 30, // Reduced button size
+                              ),
+                            ),
+                          ),
+                        ),
 
-
-              SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  ElevatedButton(
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        final userData = {
-                          "user_name": _usernameController.text,
-                          "password": _passwordController.text,
-                          "mobile": _mobileController.text,
-                          "email": _emailController.text,
-                          "gender": _selectedGenderOption?.title, // Changed to title
-                          "dob": _dateOfBirth?.toIso8601String(),
-                          "marriage_date": _dateOfMarriage?.toIso8601String(),
-                          "welcome_note": _welcomeNoteController.text,
-                          "salesman": _selectedSalesman?.smanid, // Use the ID of the salesman
-                          "profile_image": _profileImage?.path ?? '' // Handle null safely
-                        };
-
-                        // Call your API here with userData
-                        uploadAndPostProfile();
-                      }
-                    },
-                    child: Text(
-                      'Save',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: RiveAppTheme.background2,
+                        // Display remove icon if an image is selected
+                        if (_profileImage != null)
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Container(
+                              width: 50,
+                              height: 50,
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.redAccent,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  size: 16,  // Reduced close icon size
+                                  color: Colors.white,
+                                ),
+                                onPressed: _removeImage,
+                                constraints: const BoxConstraints(
+                                  minWidth: 30,  // Reduced button size
+                                  minHeight: 30, // Reduced button size
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: 16),
-                  OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text('Cancel'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: RiveAppTheme.backgroundDark,
-                      side: BorderSide(color: RiveAppTheme.background2),
+
+
+                ),
+
+                const SizedBox(height: 32),
+
+                // Form Fields in Cards
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4, bottom: 16),
+                          child: Text(
+                            'Basic Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        TextFormField(
+                          controller: _usernameController,
+                          decoration: const InputDecoration(
+                            labelText: 'User Name *',
+                            prefixIcon: Icon(Icons.person_outline),
+                          ),
+                          validator: (value) =>
+                          value!.isEmpty ? 'Please enter a name' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Password *',
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isPasswordVisible
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.grey[600],
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isPasswordVisible = !_isPasswordVisible;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: !_isPasswordVisible,
+                          validator: (value) =>
+                          value!.isEmpty ? 'Please enter a password' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _mobileController,
+                          decoration: const InputDecoration(
+                            labelText: 'Mobile Number *',
+                            prefixIcon: Icon(Icons.phone_outlined),
+                          ),
+                          keyboardType: TextInputType.phone,
+                          validator: (value) =>
+                          value!.isEmpty ? 'Please enter a mobile number' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(
+                            labelText: 'Email *',
+                            prefixIcon: Icon(Icons.email_outlined),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) =>
+                          value!.isEmpty ? 'Please enter an email' : null,
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ],
+                ),
+
+                const SizedBox(height: 24),
+
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(left: 4, bottom: 16),
+                          child: Text(
+                            'Additional Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        DropdownButtonFormField<GenderOption>(
+                          decoration: const InputDecoration(
+                            labelText: 'Gender *',
+                            prefixIcon: Icon(Icons.person_outline),
+                          ),
+                          value: _selectedGenderOption,
+                          items: genderOptions.map((GenderOption genderOption) {
+                            return DropdownMenuItem<GenderOption>(
+                              value: genderOption,
+                              child: Text(genderOption.title),
+                            );
+                          }).toList(),
+                          onChanged: (GenderOption? newValue) {
+                            setState(() {
+                              _selectedGenderOption = newValue;
+                              _selectedFxdIdGen = newValue?.fxdIdGen;
+                            });
+                          },
+                          validator: (value) =>
+                          value == null ? 'Please select a gender' : null,
+                        ),
+                        const SizedBox(height: 16),
+                        InkWell(
+                          onTap: () => _selectDate(context, true),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Date of Birth',
+                              prefixIcon: Icon(Icons.cake_outlined),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _dateOfBirth == null
+                                      ? 'Select Date'
+                                      : '${_dateOfBirth!.day}-${_dateOfBirth!.month}-${_dateOfBirth!.year}',
+                                  style: TextStyle(
+                                    color: _dateOfBirth == null
+                                        ? Colors.grey[600]
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        InkWell(
+                          onTap: () => _selectDate(context, false),
+                          child: InputDecorator(
+                            decoration: const InputDecoration(
+                              labelText: 'Date of Marriage',
+                              prefixIcon: Icon(Icons.favorite_outline),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _dateOfMarriage == null
+                                      ? 'Select Date'
+                                      : '${_dateOfMarriage!.day}-${_dateOfMarriage!.month}-${_dateOfMarriage!.year}',
+                                  style: TextStyle(
+                                    color: _dateOfMarriage == null
+                                        ? Colors.grey[600]
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                const Icon(Icons.arrow_drop_down),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _welcomeNoteController,
+                          decoration: const InputDecoration(
+                            labelText: 'Welcome Note',
+                            prefixIcon: Icon(Icons.note_outlined),
+                          ),
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 16),
+                        SearchableDropdown(
+                          items: salesmen,
+                          value: _selectedSalesman,
+                          labelText: 'Select Salesman *',
+                          onChanged: (SalesManModel? newValue) {
+                            setState(() {
+                              _selectedSalesman = newValue;
+                              _selectFXIdSales = newValue?.smanid;
+                            });
+                          },
+                          validator: (value) => value == null ? 'Please select a salesman' : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Action Buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: RiveAppTheme.backgroundDark,
+                        side: BorderSide(color: RiveAppTheme.background2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_formKey.currentState!.validate()) {
+                          final userData = {
+                            "user_name": _usernameController.text,
+                            "password": _passwordController.text,
+                            "mobile": _mobileController.text,
+                            "email": _emailController.text,
+                            "gender": _selectedGenderOption?.title,
+                            "dob": _dateOfBirth?.toIso8601String(),
+                            "marriage_date": _dateOfMarriage?.toIso8601String(),
+                            "welcome_note": _welcomeNoteController.text,
+                            "salesman": _selectedSalesman?.smanid,
+                            "profile_image": _profileImage?.path ?? ''
+                          };
+                          uploadAndPostProfile();
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: RiveAppTheme.background2,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text(
+                        'Save',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-
 
 }
 
@@ -954,3 +1134,172 @@ final List<GenderOption> genderOptions = [
   GenderOption(id: 2, title: 'Female', fxdIdGen: 601),
   GenderOption(id: 3, title: 'Other', fxdIdGen: 602),
 ];
+
+class SearchableDropdown extends StatefulWidget {
+  final List<SalesManModel> items;
+  final SalesManModel? value;
+  final Function(SalesManModel?) onChanged;
+  final String labelText;
+  final String? Function(SalesManModel?)? validator;
+
+  const SearchableDropdown({
+    Key? key,
+    required this.items,
+    required this.value,
+    required this.onChanged,
+    required this.labelText,
+    this.validator,
+  }) : super(key: key);
+
+  @override
+  State<SearchableDropdown> createState() => _SearchableDropdownState();
+}
+
+class _SearchableDropdownState extends State<SearchableDropdown> {
+  final TextEditingController _searchController = TextEditingController();
+  List<SalesManModel> _filteredItems = [];
+
+  @override
+  void initState() {
+    super.initState();
+    print("check salessman listttt${widget.items}");
+    _filteredItems = widget.items;
+  }
+
+  void _filterItems(String query) {
+    setState(() {
+      _filteredItems = widget.items
+          .where((item) => item.sman!
+          .toLowerCase()
+          .contains(query.toLowerCase()))
+          .toList();
+    });
+  }
+
+  void _showBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          maxChildSize: 0.9,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (context, scrollController) {
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Search salesman...',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              setState(() {
+                                _filterItems(value);
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: _filteredItems.length,
+                        itemBuilder: (context, index) {
+                          final item = _filteredItems[index];
+                          return ListTile(
+                            title: Text(
+                              item.sman!,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            selected: widget.value?.smanid == item.smanid,
+                            onTap: () {
+                              widget.onChanged(item);
+                              Navigator.pop(context);
+                              _searchController.clear();
+                              _filterItems('');
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FormField<SalesManModel>(
+      validator: widget.validator,
+      builder: (FormFieldState<SalesManModel> state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: _showBottomSheet,
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: widget.labelText,
+                  prefixIcon: const Icon(Icons.person_search_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  errorText: state.hasError ? state.errorText : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      widget.value?.sman ?? 'Select Salesman',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: widget.value == null ? Colors.grey : Colors.black,
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+}

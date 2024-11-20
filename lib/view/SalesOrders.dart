@@ -205,6 +205,9 @@ class _SalesOrderListState extends State<SalesOrderList> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    // Adjust the tablet breakpoint to match your device
+    final isTablet = screenWidth >= 533;
     return Scaffold(
       appBar: AppBar(
         title: Text('Sales Orders'),
@@ -269,7 +272,13 @@ class _SalesOrderListState extends State<SalesOrderList> {
                   ),
                 ),
               )
-                  : ListView.builder(
+                  : GridView.builder(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isTablet ? 2 : 1,
+                // Lower the childAspectRatio to increase the height of the card
+                childAspectRatio: isTablet ? 1.87:1.87, // Adjust this value to make the card taller
+                crossAxisSpacing: 1,
+                mainAxisSpacing: 5,
+              ),
                 itemCount: filteredOrders.length,
                 itemBuilder: (context, index) {
                   final order = filteredOrders[index];
@@ -751,8 +760,15 @@ class _SalesOrderListState extends State<SalesOrderList> {
               decoration: InputDecoration(
                 labelText: 'Search Orders',
                 border: OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    searchController.clear(); // Clears the text in the TextField
+                  },
+                ),
               ),
-            ),
+            )
+
           ),
         ),
 

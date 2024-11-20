@@ -210,6 +210,7 @@ class _AdminProfileState extends State<AdminProfile> {
       "dob": "2022-05-22",
       "wad": "2024-05-22",
       "isactive":true,
+      "url_photo": profilePic,
       "wnote": _welcomeNoteController.text
     };
 
@@ -316,8 +317,9 @@ class _AdminProfileState extends State<AdminProfile> {
 
   Future<void> _pickImage() async {
     final ImagePicker _picker = ImagePicker();
-    // Show a dialog to choose between camera or gallery
-    final pickedFile = await showDialog<XFile>(
+
+    // Show a dialog to choose between camera, gallery, or remove options
+    final pickedFile = await showDialog<XFile?>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -337,14 +339,36 @@ class _AdminProfileState extends State<AdminProfile> {
               },
               child: Text('Gallery'),
             ),
+
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(null); // Pass null to indicate removal
+                setState(() {
+                  profilePic = "";
+                });
+              },
+              child: Text('Remove'),
+            ),
           ],
         );
       },
     );
 
     if (pickedFile != null) {
+      // If a new image is selected, update _profileImage
       setState(() {
-        _profileImage = File(pickedFile.path); // Store the selected image
+        _profileImage = File(pickedFile.path);
+      });
+    } else if (_profileImage != null) {
+      // If "Remove" is selected and an image exists, delete the file
+      try {
+        await _profileImage!.delete();
+
+      } catch (e) {
+        print('Error deleting image file: $e');
+      }
+      setState(() {
+        _profileImage = null; // Clear the image reference
       });
     }
   }

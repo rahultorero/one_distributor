@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 class ApiConfig {
   static const String baseUrl = 'http://182.70.116.222:8000'; // Replace with your base URL
   static const String header = "Content-Type': 'application/json";
@@ -32,8 +34,15 @@ class ApiConfig {
   static const String getMappedProduct = "/matching_product";
   static const String getUnMappedProduct = "/get_unmatched_product";
   static const String MappedProduct = "/mapping_product";
-
-
+  static const String get_map_product = "/get_map_product";
+  static const String get_unmatched_product = "/get_unmatched_product";
+  static const String post_mapped_product = "/mapping_product";
+  static const String delete_mapped_product = "/deleteProductMapping";
+  static const String matching_party = "/matching_party";
+  static const String unmatched_party = "/unmatched_party";
+  static const String mapping_party = "/mapping_party";
+  static const String get_mapping_retailer = "/get_mapping_retailer";
+  static const String deleteMappingRetailer = "/deleteMappingRetailer";
 
 
 
@@ -148,5 +157,37 @@ class ApiConfig {
 
   static String postMapProduct(){
     return '$baseUrl$MappedProduct';
+  }
+
+  static String reqMappedProduct(){
+    return '$baseUrl$get_map_product';
+  }
+  static String reqUnmappedProduct(){
+    return '$baseUrl$getUnMappedProduct';
+  }
+  static String reqEditMapProduct(){
+    return '$baseUrl$post_mapped_product';
+  }
+  static String reqDeleteMapProduct(){
+    return '$baseUrl$delete_mapped_product';
+  }
+
+  static String reqMatchingParty(){
+    return '$baseUrl$matching_party';
+  }
+
+  static String reqUnmatchedParty(){
+    return '$baseUrl$unmatched_party';
+  }
+
+  static String reqMappingParty(){
+    return '$baseUrl$mapping_party';
+  }
+
+  static String reqget_mapping_retailer(){
+    return '$baseUrl$get_mapping_retailer';
+  }
+  static String reqDeleteRetailer(){
+    return '$baseUrl$deleteMappingRetailer';
   }
 }

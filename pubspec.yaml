@@ -49,6 +49,14 @@ dependencies:
   lottie: ^3.1.2
   flutter_ripple: ^0.0.3
   fluttertoast: ^8.2.8
+  url_launcher: ^6.3.1
+  permission_handler: ^11.3.1
+  pdf: ^3.11.1
+  share_plus: ^10.1.2
+  path_provider: ^2.1.5  # or the latest version
+  open_file: ^3.2.1      # or the latest version
+  fl_chart: ^0.65.0
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -83,10 +91,15 @@ flutter:
     - assets/images/upload_icon.svg
     - assets/images/user_icon.svg
     - assets/images/cloud_icon.svg
+    - assets/images/logo.png
     - assets/rive/
     - assets/animations/empty_state.json
     - assets/animations/order.json
     - assets/animations/empty_state2.json
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
+    - assets/fonts/Roboto-Italic.ttf
+    - assets/fonts/Roboto-BoldItalic.ttf
 
 
 

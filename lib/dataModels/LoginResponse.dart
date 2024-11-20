@@ -1,12 +1,14 @@
 class LoginResponse {
   String? message;
   UserData? data;
+  int statusCode;
 
-  LoginResponse({this.message, this.data});
+  LoginResponse({this.message, this.data,required this.statusCode});
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
       message: json['message'],
+      statusCode: json['statusCode'],
       data: json['data'] != null ? UserData.fromJson(json['data']) : null,
     );
   }
@@ -60,11 +62,11 @@ class UserData {
       uNo: json['u_no'],
       profilePic: json['profile_pic'],
       division: json['Division'],
-      grpCode: json['grp_code'],
+      grpCode: json['grp_code'] ?? "",
       userId: json['user_id'],
       token: json['token'],
       role: json['role'],
-      companyId: json['company_id'],
+      companyId: json['company_id'] ?? 0,
       wnote: json['wnote'],
       smid: json['smid'],
     );

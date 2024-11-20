@@ -1,3 +1,6 @@
+import 'package:distributers_app/view/MappedProductScreen.dart';
+import 'package:distributers_app/view/MappedRetailerScreen.dart';
+import 'package:distributers_app/view/UnmappedRetailerScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +31,7 @@ class _SideMenuState extends State<SideMenu> {
   final List<MenuItemModel> _themeMenuIcon = MenuItemModel.menuItems3;
 
   String? _selectedMenu;
+  String? _currentRoute;
   bool _isDarkMode = false;
   String? name;
   String? division;
@@ -53,7 +57,6 @@ class _SideMenuState extends State<SideMenu> {
   Future<void> _handleLogout() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Clear specific keys instead of all preferences
       await prefs.remove("user");
       await prefs.remove("division");
       await prefs.remove("isLoggedIn");
@@ -61,11 +64,8 @@ class _SideMenuState extends State<SideMenu> {
       await prefs.remove("u_id");
       await prefs.remove("companyId");
       await prefs.remove("smid");
-
-      // Set login status to false
       await prefs.setBool("isLoggedIn", false);
 
-      // Navigate and clear stack
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => MainScreens()),
@@ -82,48 +82,45 @@ class _SideMenuState extends State<SideMenu> {
   }
 
   void onMenuPress(MenuItemModel menu) {
-    setState(() {
-      _selectedMenu = menu.title;
-    });
-
     if (menu.route != null) {
       if (menu.route == '/logout') {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: Text('Confirm Logout'),
-              content: Text('Are you sure you want to logout?'),
-              actions: [
-                TextButton(
-                  child: Text('Cancel'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                TextButton(
-                  child: Text('Logout'),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _handleLogout();
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      } else {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => _getPageForRoute(menu.route!),
-          ),
-        ).then((_) {
-          // Don't reset selection when returning
-          // setState(() {
-          //   _selectedMenu = null;
-          // });
-        });
+        _showLogoutDialog();
+        return;
       }
+
+      // If the menu item is already selected and the route is the same,
+      // don't navigate again but reset the selection
+      if (_selectedMenu == menu.title && _currentRoute == menu.route) {
+        setState(() {
+          _selectedMenu = null;
+          _currentRoute = null;
+        });
+        return;
+      }
+
+      // Update selection and route
+      setState(() {
+        _selectedMenu = menu.title;
+        _currentRoute = menu.route;
+      });
+
+      // Navigate to the new route
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => _getPageForRoute(menu.route!),
+        ),
+      ).then((_) {
+        // When returning, reset both selection and route
+        if (mounted) {
+          setState(() {
+            _selectedMenu = null;
+            _currentRoute = null;
+          });
+        }
+      });
     }
   }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -139,6 +136,7 @@ class _SideMenuState extends State<SideMenu> {
                 Navigator.of(context).pop();
                 setState(() {
                   _selectedMenu = null;
+                  _currentRoute = null;
                 });
               },
             ),
@@ -158,7 +156,6 @@ class _SideMenuState extends State<SideMenu> {
     );
   }
 
-
   Widget _getPageForRoute(String route) {
     switch (route) {
       case '/home':
@@ -173,6 +170,12 @@ class _SideMenuState extends State<SideMenu> {
         return DraftOrderList();
       case '/product_map':
         return ProductMappingScreen();
+      case '/map_product':
+        return MappedProductScreen();
+      case '/retailers_mapping':
+        return MappedRetailerScreen();
+      case '/unmapped_retailer':
+        return UnmappedRetailerScreen();
       case '/out_standing':
         return OutStandingList();
       default:
@@ -214,6 +217,7 @@ class _SideMenuState extends State<SideMenu> {
                   MenuButtonSection(
                     title: "BROWSE",
                     selectedMenu: _selectedMenu ?? "",
+                    currentRoute: _currentRoute,
                     menuIcons: _browseMenuIcons,
                     onMenuPress: onMenuPress,
                   ),
@@ -234,7 +238,15 @@ class _SideMenuState extends State<SideMenu> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (context) => ProfileScreen()),
-          );
+          ).then((_) {
+            // Reset selection when returning from profile
+            if (mounted) {
+              setState(() {
+                _selectedMenu = null;
+                _currentRoute = null;
+              });
+            }
+          });
         },
         child: Row(
           children: [
@@ -280,7 +292,6 @@ class _SideMenuState extends State<SideMenu> {
   Widget _buildThemeToggle() {
     return InkWell(
       onTap: () {
-        // Check if menuItems3 has the logout item
         if (_themeMenuIcon.isNotEmpty) {
           final logoutMenu = _themeMenuIcon[0];
           if (logoutMenu.route == '/logout') {
@@ -337,11 +348,13 @@ class MenuButtonSection extends StatefulWidget {
     required this.title,
     required this.menuIcons,
     required this.selectedMenu,
+    this.currentRoute,
     this.onMenuPress,
   }) : super(key: key);
 
   final String title;
   final String selectedMenu;
+  final String? currentRoute;
   final List<MenuItemModel> menuIcons;
   final Function(MenuItemModel menu)? onMenuPress;
 

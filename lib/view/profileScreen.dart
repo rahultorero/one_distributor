@@ -208,6 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       "dob": "2022-05-22",
       "wad": "2024-05-22",
       "isactive":true,
+      "url_photo": profilePic,
       "wnote": _welcomeNoteController.text
     };
 
@@ -314,8 +315,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickImage() async {
     final ImagePicker _picker = ImagePicker();
-    // Show a dialog to choose between camera or gallery
-    final pickedFile = await showDialog<XFile>(
+
+    // Show a dialog to choose between camera, gallery, or remove options
+    final pickedFile = await showDialog<XFile?>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -335,17 +337,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
               child: Text('Gallery'),
             ),
+
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(null); // Pass null to indicate removal
+                  setState(() {
+                    profilePic = "";
+                  });
+                },
+                child: Text('Remove'),
+              ),
           ],
         );
       },
     );
 
     if (pickedFile != null) {
+      // If a new image is selected, update _profileImage
       setState(() {
-        _profileImage = File(pickedFile.path); // Store the selected image
+        _profileImage = File(pickedFile.path);
+      });
+    } else if (_profileImage != null) {
+      // If "Remove" is selected and an image exists, delete the file
+      try {
+        await _profileImage!.delete();
+
+      } catch (e) {
+        print('Error deleting image file: $e');
+      }
+      setState(() {
+        _profileImage = null; // Clear the image reference
       });
     }
   }
+
 
   Future<void> _selectDate(BuildContext context, String label) async {
     DateTime? selectedDate = await showDatePicker(
@@ -546,39 +571,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Profile Image with Camera Icon in the center
-                  Center(
-                    child: CircleAvatar(
-                      radius: 45,
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      backgroundImage: _profileImage != null
-                          ? FileImage(_profileImage!) // Show selected image from file
-                          : (profilePic != null && profilePic!.isNotEmpty
-                          ? NetworkImage(profilePic!) // Show image from URL
-                          : null), // If no URL, show null
+              Center(
+              child: CircleAvatar(
+              radius: 45,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                backgroundImage: _profileImage != null
+                    ? FileImage(_profileImage!) // Show selected image from file
+                    : (profilePic != null && profilePic!.isNotEmpty
+                    ? NetworkImage(profilePic!) // Show image from URL
+                    : null), // No image if no file or URL
 
-                      child: Stack(
-                        children: [
-                          if (_profileImage == null && (profilePic == null || profilePic!.isEmpty)) // Show default icon if no image is selected and no URL
-                            Align(
-                              alignment: Alignment.center,
-                              child: Icon(Icons.person, size: 40, color: Colors.white),
-                            ),
-                          Align(
-                            alignment: Alignment.bottomRight,
-                            child: CircleAvatar(
-                              radius: 15,
-                              backgroundColor: Colors.white,
-                              child: IconButton(
-                                icon: Icon(Icons.camera_alt, size: 15, color: Colors.black),
-                                onPressed: _pickImage, // Open camera or gallery
-                              ),
-                            ),
-                          ),
-                        ],
+                child: Stack(
+                  children: [
+                    if (_profileImage == null && (profilePic == null || profilePic!.isEmpty)) // Default icon if no image
+                      Align(
+                        alignment: Alignment.center,
+                        child: Icon(Icons.person, size: 40, color: Colors.white),
+                      ),
+                    Align(
+                      alignment: Alignment.bottomRight,
+                      child: CircleAvatar(
+                        radius: 15,
+                        backgroundColor: Colors.white,
+                        child: IconButton(
+                          icon: Icon(Icons.camera_alt, size: 15, color: Colors.black),
+                          onPressed: _pickImage, // Open dialog to choose image
+                        ),
                       ),
                     ),
-
-                  ),
+                  ],
+                ),
+              ),
+            ),
 
 
                   SizedBox(height: 30),

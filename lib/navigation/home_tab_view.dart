@@ -1,3 +1,4 @@
+import 'package:distributers_app/view/DashBoard.dart';
 import 'package:flutter/material.dart';
 
 import '../components/hcard.dart';
@@ -27,7 +28,7 @@ class _HomeTabViewState extends State<HomeTabView> {
           color: RiveAppTheme.background,
           borderRadius: BorderRadius.circular(30),
         ),
-
+        child:DashBoardContent(),
       ),
     );
   }

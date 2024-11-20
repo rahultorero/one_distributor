@@ -245,7 +245,7 @@ class _SignInState extends State<SignIn> with TickerProviderStateMixin {
         final loginResponse = LoginResponse.fromJson(jsonDecode(response.body));
         print(loginResponse.message);
 
-        if (loginResponse.message == "Admin login successfully") {
+        if (loginResponse.statusCode == 200) {
           print('Login successful: ${loginResponse.data?.user}');
           print('Token: ${loginResponse.data?.token}');
 
@@ -277,9 +277,11 @@ class _SignInState extends State<SignIn> with TickerProviderStateMixin {
             btnOkOnPress: () {
               debugPrint('Dialog button clicked');
               // Navigate to home screen on success
-              Navigator.of(context).pushReplacement(
+              Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => Home()),
+                    (Route<dynamic> route) => false,
               );
+
             },
             btnOkIcon: Icons.check_circle,
           ).show();

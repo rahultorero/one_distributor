@@ -1,3 +1,4 @@
+import 'package:distributers_app/view/DashBoard.dart';
 import 'package:distributers_app/view/companyDetails.dart';
 import 'package:distributers_app/view/signIn.dart';
 import 'package:distributers_app/view/signUp.dart';
@@ -149,8 +150,7 @@ class _HomeState extends State<Home>
       Scaffold(
       extendBody: true,
       body: Stack(
-        children: [
-          Positioned(child: Container(color: RiveAppTheme.background2)),
+        children: [Positioned(child: Container(color: RiveAppTheme.background2)),
           RepaintBoundary(
             child: AnimatedBuilder(
               animation: _sidebarAnim,

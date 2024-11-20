@@ -65,6 +65,20 @@ class MenuItemModel {
       assetPath: 'assets/images/retailers_icon.svg',
       iconType: IconType.asset,
       route: '/retailers_mapping', // Add route
+      children: [ // Add child items for Order
+        MenuItemModel(
+          title: "Unmapped Retailer",
+          assetPath: 'assets/images/retailers_icon.svg',
+          iconType: IconType.asset,
+          route: '/unmapped_retailer',
+        ),
+        MenuItemModel(
+          title: "Mapped Retailer",
+          assetPath: 'assets/images/retailers_icon.svg',
+          iconType: IconType.asset,
+          route: '/retailers_mapping',
+        ),
+      ],
     ),
     MenuItemModel(
       title: "Product Mapping",
@@ -85,12 +99,6 @@ class MenuItemModel {
           route: '/map_product',
         ),
       ],// Add route
-    ),
-    MenuItemModel(
-      title: "Upload Data",
-      assetPath: 'assets/images/upload_icon.svg',
-      iconType: IconType.asset,
-      route: '/upload_data', // Add route
     ),
     MenuItemModel(
       title: "User",

@@ -1,20 +1,19 @@
-class UnMatchProductResponse {
+class UnMappedProductRes {
   String? message;
   int? statusCode;
   int? count;
-  List<UnMatchProductModel>? data;
+  List<UnmappedProduct>? data;
 
-  UnMatchProductResponse(
-      {this.message, this.statusCode, this.count, this.data});
+  UnMappedProductRes({this.message, this.statusCode, this.count, this.data});
 
-  UnMatchProductResponse.fromJson(Map<String, dynamic> json) {
+  UnMappedProductRes.fromJson(Map<String, dynamic> json) {
     message = json['message'];
     statusCode = json['statusCode'];
     count = json['count'];
     if (json['data'] != null) {
-      data = <UnMatchProductModel>[];
+      data = <UnmappedProduct>[];
       json['data'].forEach((v) {
-        data!.add(new UnMatchProductModel.fromJson(v));
+        data!.add(new UnmappedProduct.fromJson(v));
       });
     }
   }
@@ -31,9 +30,9 @@ class UnMatchProductResponse {
   }
 }
 
-class UnMatchProductModel {
-  int? dmfgid;
-  int? pmfgid;
+class UnmappedProduct {
+  String? dmfgid;
+  String? pmfgid;
   String? pname;
   int? pid;
   String? aCode;
@@ -42,7 +41,7 @@ class UnMatchProductModel {
   String? packing;
   String? grpidGenName;
 
-  UnMatchProductModel(
+  UnmappedProduct(
       {this.dmfgid,
         this.pmfgid,
         this.pname,
@@ -53,7 +52,7 @@ class UnMatchProductModel {
         this.packing,
         this.grpidGenName});
 
-  UnMatchProductModel.fromJson(Map<String, dynamic> json) {
+  UnmappedProduct.fromJson(Map<String, dynamic> json) {
     dmfgid = json['dmfgid'];
     pmfgid = json['pmfgid'];
     pname = json['pname'];

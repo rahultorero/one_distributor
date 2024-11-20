@@ -3,20 +3,22 @@ import 'dart:convert';
 import 'package:distributers_app/dataModels/MappedProductRes.dart';
 import 'package:distributers_app/dataModels/MatchProductRes.dart';
 import 'package:distributers_app/dataModels/UnMappedProductRes.dart';
+import 'package:distributers_app/dataModels/UnmappedRetailerList.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../components/LoadingIndicator.dart';
+import '../dataModels/MappedRetailerList.dart';
 import '../dataModels/StoreModel.dart';
 import '../services/api_services.dart';
 import 'package:http/http.dart' as http;
 
-class MappedProductScreen extends StatefulWidget {
+class MappedRetailerScreen extends StatefulWidget {
   @override
-  _MappedProductScreenState createState() => _MappedProductScreenState();
+  _MappedRetailerScreenState createState() => _MappedRetailerScreenState();
 }
 
-class _MappedProductScreenState extends State<MappedProductScreen> {
+class _MappedRetailerScreenState extends State<MappedRetailerScreen> {
   TextEditingController searchController = TextEditingController();
   String? selectedCompanyName;
   int? selectedCompanyId;
@@ -26,8 +28,8 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
   bool _isSearchVisible = false;
   bool _isDateRangeVisible = false;
   bool isLoading = true; // To manage loading state
-  late MappedProductRes product = MappedProductRes(data: []) ; // This will hold the fetched invoices
-  late MappedProductRes filterProduct = MappedProductRes(data: []);
+  late MappedRetailerList product = MappedRetailerList(data: []) ; // This will hold the fetched invoices
+  late MappedRetailerList filterProduct = MappedRetailerList(data: []);
 
 
   String searchQuery = '';
@@ -47,7 +49,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
         // Fetch companies using the division value
         stores = await fetchCompanies(regCode!);
         selectedCompanyId = stores[0].companyId;
-        await _fetchMappedProduct();
+        await _fetchMappedRetailer();
       }
     } catch (e) {
       // Handle any errors that occur during fetching
@@ -83,8 +85,8 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     }
   }
 
-  Future<void> _fetchMappedProduct() async {
-    String apiUrl = ApiConfig.reqMappedProduct(); // Replace with actual API URL
+  Future<void> _fetchMappedRetailer() async {
+    String apiUrl = ApiConfig.reqget_mapping_retailer(); // Replace with actual API URL
     DateTime today = DateTime.now();
 
     // Format dates as 'YYYY-MM-DD'
@@ -95,8 +97,6 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     final body = jsonEncode({
       "reg_code": regCode?.substring(0, 7),
       "companyid": selectedCompanyId,
-      "userInput":searchController.text,
-      "pagenum": 1,
     });
 
     print("check the bodies  $body");
@@ -128,7 +128,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
 
         if (invoiceList != null && invoiceList.isNotEmpty) {
           setState(() {
-            product.data = invoiceList.map((json) => MappedProduct.fromJson(json)).toList();
+            product.data = invoiceList.map((json) => RetailerMapped.fromJson(json)).toList();
             filterProduct = product;
           });
         } else {
@@ -165,7 +165,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
       backgroundColor: Color(0xFFF8FAFC),
       appBar: _buildAppBar(),
       body:
-      filterProduct.data.isEmpty
+      filterProduct.data!.isEmpty
           ? Center(child: LoadingIndicator()):
       Column(
         children: [
@@ -191,7 +191,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
       backgroundColor: Colors.white,
       elevation: 0,
       title: Text(
-        'Product Mapping',
+        'MAPPED REATILERS',
         style: TextStyle(
           color: Color(0xFF1E293B),
           fontSize: 18,
@@ -285,7 +285,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                 ),
               ),
               onChanged: (value) {
-                _fetchMappedProduct();
+                _fetchMappedRetailer();
               },
             ),
           ),
@@ -307,7 +307,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     );
   }
 
-  Widget _buildProductCard(MappedProduct mapping) {
+  Widget _buildProductCard(RetailerMapped mapping) {
     return Container(
       margin: EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -332,7 +332,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     );
   }
 
-  Widget _buildProductSection(MappedProduct product, String label) {
+  Widget _buildProductSection(RetailerMapped product, String label) {
     return Padding(
       padding: EdgeInsets.all(12),
       child: Column(
@@ -356,7 +356,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  product.mPcode.toString() ?? "",
+                  product.rId.toString() ?? "",
                   style: TextStyle(
                     color: Color(0xFF64748B),
                     fontSize: 12,
@@ -368,7 +368,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            "${product.mPname}${product.mPacking}" ?? "",
+            "${product.partyname}" ?? "",
             style: TextStyle(
               color: Color(0xFF1E293B),
               fontSize: 14,
@@ -383,7 +383,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
               Container(
                 width: 130,
                 child: Text(
-                  product.mChild ?? "",
+                  product.partyAdd1 ?? "",
                   style: TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 13,
@@ -397,7 +397,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
               Container(
                 width:130,
                 child: Text(
-                  product.mGrpidGenName ?? "",
+                  product.partyEmail ?? "",
                   style: TextStyle(
                     color: Color(0xFF64748B),
                     fontSize: 13,
@@ -413,7 +413,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     );
   }
 
-  Widget _buildMappedProductSection(MappedProduct product, String label) {
+  Widget _buildMappedProductSection(RetailerMapped product, String label) {
     return Padding(
       padding: EdgeInsets.all(12),
       child: Column(
@@ -437,7 +437,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  product.mPcode.toString() ?? "",
+                  product.rId.toString() ?? "",
                   style: TextStyle(
                     color: Color(0xFF64748B),
                     fontSize: 12,
@@ -449,7 +449,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            "${product.oPname}${product.oPacking ?? ""}" ?? "",
+            "${product.retaName} " ?? "",
             style: TextStyle(
               color: Color(0xFF1E293B),
               fontSize: 14,
@@ -464,7 +464,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
               Container(
                 width: 130,
                 child: Text(
-                  product.oChild ?? "",
+                  product.retaAdd1 ?? "",
                   style: TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 13,
@@ -478,7 +478,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
               Container(
                 width: 110,
                 child: Text(
-                  product.oGrpidGenName ?? "",
+                  product.retaEmail ?? "",
                   style: TextStyle(
                       color: Color(0xFF64748B),
                       fontSize: 13,
@@ -496,7 +496,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
   }
 
 
-  Widget _buildCardActions(MappedProduct mapping) {
+  Widget _buildCardActions(RetailerMapped mapping) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       decoration: BoxDecoration(
@@ -537,23 +537,23 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     );
   }
 
-  Future<void> _showMappingDialog(MappedProduct mapping) async {
+  Future<void> _showMappingDialog(RetailerMapped mapping) async {
     String searchQuery = '';
     TextEditingController searchController = TextEditingController();
-    UnmappedProduct? selectedProduct;
-    List<UnmappedProduct> searchResults = [];
+    RetailerUnmapped? selectedProduct;
+    List<RetailerUnmapped> searchResults = [];
     bool isLoading = false;
 
     // Helper function to safely convert dynamic list to UnmappedProduct list
-    List<UnmappedProduct> parseProducts(List<dynamic> data) {
+    List<RetailerUnmapped> parseProducts(List<dynamic> data) {
       return data.map((json) {
         try {
-          return UnmappedProduct.fromJson(json as Map<String, dynamic>);
+          return RetailerUnmapped.fromJson(json as Map<String, dynamic>);
         } catch (e) {
           print('Error parsing product: $e');
           return null;
         }
-      }).whereType<UnmappedProduct>().toList();
+      }).whereType<RetailerUnmapped>().toList();
     }
 
     return showDialog(
@@ -632,9 +632,9 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     SizedBox(
-                                      width: 100,
+                                      width: 70,
                                       child: Text(
-                                        'Manufacturer',
+                                        'Name',
                                         style: TextStyle(
                                           color: Colors.grey.shade600,
                                           fontSize: 14,
@@ -643,7 +643,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                     ),
                                     Expanded(
                                       child: Text(
-                                        selectedProduct?.dmfgName ?? '-',
+                                        selectedProduct?.regName ?? '-',
                                         style: TextStyle(
                                           color: Colors.grey.shade900,
                                           fontSize: 14,
@@ -660,9 +660,9 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     SizedBox(
-                                      width: 100,
+                                      width: 70,
                                       child: Text(
-                                        'Product Code',
+                                        'Code',
                                         style: TextStyle(
                                           color: Colors.grey.shade600,
                                           fontSize: 14,
@@ -671,7 +671,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                     ),
                                     Expanded(
                                       child: Text(
-                                        selectedProduct?.aCode ?? '-',
+                                        selectedProduct?.rCode.toString() ?? '-',
                                         style: TextStyle(
                                           color: Colors.grey.shade900,
                                           fontSize: 14,
@@ -688,9 +688,9 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     SizedBox(
-                                      width: 100,
+                                      width: 70,
                                       child: Text(
-                                        'Generic Name',
+                                        'Email',
                                         style: TextStyle(
                                           color: Colors.grey.shade600,
                                           fontSize: 14,
@@ -699,7 +699,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                     ),
                                     Expanded(
                                       child: Text(
-                                        selectedProduct?.grpidGenName ?? '-',
+                                        selectedProduct?.email ?? '-',
                                         style: TextStyle(
                                           color: Colors.grey.shade900,
                                           fontSize: 14,
@@ -757,7 +757,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
 
                               try {
                                 final response = await http.post(
-                                  Uri.parse(ApiConfig.reqUnmappedProduct()),
+                                  Uri.parse(ApiConfig.reqUnmatchedParty()),
                                   headers: {'Content-Type': 'application/json'},
                                   body: jsonEncode({
                                     "reg_code": regCode?.substring(0, 7),
@@ -771,7 +771,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
 
                                 if (response.statusCode == 200) {
                                   final responseData = json.decode(response.body);
-                                  final List<dynamic> productList = responseData['data'] ?? responseData['products'] ?? [];
+                                  final List<dynamic> productList = responseData['data'] ?? [];
                                   print("check the responseeee ${responseData}");
                                   setState(() {
                                     searchResults = parseProducts(productList);
@@ -841,14 +841,14 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                   final product = searchResults[index];
                                   return ListTile(
                                     title: Text(
-                                      "${product.pname}${product.packing ?? ""}" ?? "",
+                                      "${product.regName}" ?? "",
                                       style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                     subtitle: Text(
-                                      product.dmfgName ?? "",
+                                      product.add1 ?? "",
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey.shade600,
@@ -857,7 +857,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
                                     onTap: () {
                                       setState(() {
                                         selectedProduct = product;
-                                        searchController.text = product.pname ?? "";
+                                        searchController.text = product.regName ?? "";
                                         searchResults = [];
                                       });
                                     },
@@ -932,28 +932,30 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     return prefs.getInt("u_id"); // Replace with your key
   }
 
-  Future<void> EditMappedProduct(UnmappedProduct unmapped,MappedProduct mapped) async {
-
+  Future<void> EditMappedProduct(RetailerUnmapped unmapped, RetailerMapped mapped) async {
     int? cusrid = await _getUserId();
 
-    final url = Uri.parse(ApiConfig.reqEditMapProduct()); // Replace with the actual endpoint
+    final url = Uri.parse(ApiConfig.reqMappingParty()); // Replace with the actual endpoint
     final headers = {
       'Content-Type': 'application/json',
     };
 
     final body = jsonEncode({
-      "id": mapped.id,
-      "m_product": {
-        "regcode": regCode?.substring(0, 7),
-        "itemdetailid": mapped.mItemdetailid,
-        "companyid": mapped.mCompanyid
+      "id": mapped.id, // Assuming this value comes from the mapped object
+      "party": {
+        "Regcode": mapped.regDcode ?? "", // Use the appropriate property from unmapped
+        "LedId_Party": mapped.rLedid, // Assuming these fields exist in RetailerUnmapped
+        "CompanyId": mapped.companyId ?? 0,
+        "ALCode":  ""
       },
-      "o_product": {
-        "pid": unmapped.pid,
-        "a_code": unmapped.aCode
+      "retailer": {
+        "r_id": unmapped.rId, // Assuming mapped object contains these fields
+        "reg_name": unmapped.regName ?? "",
+        "r_code": unmapped.rCode ?? "",
+        "rg_id": 0
       },
       "cusrid": cusrid,
-      "eusrid": 0
+      "eusrid": 1 // Assuming 1 is a placeholder, replace if needed
     });
 
     try {
@@ -963,7 +965,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
         body: body,
       );
 
-      print(body);
+      print("check whats the body$body");
 
       if (response.statusCode == 200) {
         // Successful request
@@ -976,7 +978,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
           ),
         );
         Navigator.pop(context);
-        _fetchMappedProduct();
+        _fetchMappedRetailer();
       } else {
         // Handle error
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1000,6 +1002,64 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
       print('Exception: $e');
     }
   }
+
+  Future<void> deleteMappedRetailer(RetailerMapped mapped) async {
+    int? cusrid = await _getUserId();
+
+    final url = Uri.parse(ApiConfig.reqDeleteRetailer()); // Replace with the actual endpoint
+    final headers = {
+      'Content-Type': 'application/json',
+    };
+
+    final body = jsonEncode({
+      "id": mapped.id, // Assuming this value comes from the mapped object
+    });
+
+    try {
+      final response = await http.post(
+        url,
+        headers: headers,
+        body: body,
+      );
+
+      print("check whats the body$body");
+
+      if (response.statusCode == 200) {
+        // Successful request
+        print('Update Successful: ${response.body}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete Successfully'),
+            backgroundColor: Colors.green, // Optional: Customize the color
+            duration: Duration(seconds: 2), // Duration for the SnackBar
+          ),
+        );
+        Navigator.pop(context);
+        _fetchMappedRetailer();
+      } else {
+        // Handle error
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Something went wrong. Please try again.'),
+            backgroundColor: Colors.red, // Optional: Customize the color
+            duration: Duration(seconds: 2), // Duration for the SnackBar
+          ),
+        );
+        print('Error: ${response.statusCode}, ${response.body}');
+      }
+    } catch (e) {
+      // Handle connection error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Something went wrong. Please try again.'),
+          backgroundColor: Colors.red, // Optional: Customize the color
+          duration: Duration(seconds: 2), // Duration for the SnackBar
+        ),
+      );
+      print('Exception: $e');
+    }
+  }
+
 
   Future<void> deleteMappedProduct(MappedProduct mapped) async {
 
@@ -1032,7 +1092,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
           ),
         );
         Navigator.pop(context);
-        _fetchMappedProduct();
+        _fetchMappedRetailer();
       } else {
         // Handle error
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1096,7 +1156,7 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
     );
   }
 
-  Future<void> _confirmDelete(int index,MappedProduct mapped) async {
+  Future<void> _confirmDelete(int index,RetailerMapped mapped) async {
     return showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1135,10 +1195,11 @@ class _MappedProductScreenState extends State<MappedProductScreen> {
               ),
             ),
             onPressed: () {
-              deleteMappedProduct(mapped);
+              deleteMappedRetailer(mapped);
               setState(() {
                 product.data!.removeAt(index);
               });
+
             },
           ),
         ],
