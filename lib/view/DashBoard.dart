@@ -1,9 +1,206 @@
+import 'dart:convert';
+import 'dart:ffi';
+
+import 'package:distributers_app/dataModels/CountDashBoard.dart';
+import 'package:distributers_app/dataModels/TopSalesManRes.dart';
+import 'package:distributers_app/services/api_services.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class DashBoardContent extends StatelessWidget {
+import '../dataModels/OutStandingDashBoard.dart';
+class DashBoardContent extends StatefulWidget {
   const DashBoardContent({Key? key}) : super(key: key);
+
+  @override
+  State<DashBoardContent> createState() => _DashBoardContentState();
+}
+
+class _DashBoardContentState extends State<DashBoardContent> {
+  late Future<OutStandingDashBoard> _dashboardFuture;
+  double receivableBalance = 0.0;
+  double payableBalance = 0.0;
+  int totalOrder = 0;
+  int totalInvoices = 0;
+  double invAmt = 0.0;
+  late Future<Map<String, dynamic>> _data;
+  List<TopSalesMan> topSalesMan = [];
+
+
+  @override
+  void initState() {
+    super.initState();
+    fetchOutStandingDashboard(); // Initialize the API call
+    fetchCountDashboard();
+    _data = getDistributorRetailerData(
+      'D000004',
+      '2024-11-15',
+      '2024-11-21',
+      'R000001',
+    );
+    fetchData();
+  }
+
+  Future<void> fetchOutStandingDashboard() async {
+    // Get reg_code and companyId from shared preferences
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? regCode = prefs.getString('reg_code');
+    final int? companyId = prefs.getInt('companyId');
+
+    // Check if values are null
+    if (regCode == null || companyId == null) {
+      throw Exception('Shared preferences do not contain reg_code or companyId');
+    }
+
+    // API request
+    final response = await http.post(
+      Uri.parse(ApiConfig.reqDashboardReceivablePayable()), // Replace with your endpoint
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "regcode": regCode,
+        "companyid": companyId,
+      }),
+    );
+
+    print("check body ${regCode} ${companyId}");
+
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      final outstanding =  OutStandingDashBoard.fromJson(jsonResponse);
+      setState(() {
+        receivableBalance = outstanding.receivableBalance ?? 0.0;
+        payableBalance = outstanding.payableBalance ?? 0.0;
+      });
+      print("check the dashboard outstanding data ${jsonResponse}");
+    } else {
+      throw Exception('Failed to load dashboard data');
+    }
+  }
+
+  Future<void> fetchCountDashboard() async {
+    // Get reg_code and companyId from shared preferences
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? regCode = prefs.getString('reg_code');
+    final int? companyId = prefs.getInt('companyId');
+
+    // Check if values are null
+    if (regCode == null || companyId == null) {
+      throw Exception('Shared preferences do not contain reg_code or companyId');
+    }
+
+    // API request
+    final response = await http.post(
+      Uri.parse(ApiConfig.reqDashboardcountOrder()), // Replace with your endpoint
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "dist_id": regCode,
+        "companyid": companyId,
+      }),
+    );
+
+    print("check body ${regCode} ${companyId}");
+
+    if (response.statusCode == 200) {
+      print("HERE");
+      final jsonResponse = jsonDecode(response.body);
+      print(jsonResponse);
+      final outstanding =  CountDashBoard.fromJson(jsonResponse);
+      setState(() {
+        invAmt = outstanding.invamt ?? 0.0;
+        totalOrder = outstanding.totalOrder ?? 0;
+        totalInvoices = outstanding.totalInvoice ?? 0;
+      });
+      print("hhhhhhhhhhhhhhhhhhhhhhhhhhhh:   ${totalOrder}");
+      print("check the dashboard outstanding data ${jsonResponse}");
+    } else {
+      throw Exception('Failed to load dashboard data');
+    }
+  }
+
+  Future<Map<String, dynamic>> getDistributorRetailerData(String distid, String startDate, String endDate, String rid) async {
+    final url = Uri.parse(
+      'http://182.70.116.222:8000/get_distributor_retailer_comparison?'
+          'distid=$distid&startDate=$startDate&endDate=$endDate&rid=$rid',
+    );
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      return {
+        'data': responseData['data'],
+        'check_high_score': responseData['check_high_score'],
+      };
+    } else {
+      throw Exception('Failed to fetch data: ${response.statusCode}');
+    }
+  }
+
+
+  Future<TopSalesManRes?> fetchTopSalesManData({
+    required String regcode,
+    required String startDate,
+    required String endDate,
+    required String companyid,
+  }) async {
+    final String baseUrl = ApiConfig.reqGet_top_10_salesmen(); // Replace with your API URL
+
+    // Construct query parameters
+    final Map<String, String> queryParams = {
+      'regcode': regcode,
+      'startDate': startDate,
+      'endDate': endDate,
+      'companyid': companyid,
+    };
+
+    final Uri uri = Uri.parse(baseUrl).replace(queryParameters: queryParams);
+
+    try {
+      // API call
+      final http.Response response = await http.get(uri);
+
+      // Check for successful response
+      if (response.statusCode == 200) {
+        // Parse the JSON response
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        return TopSalesManRes.fromJson(jsonResponse);
+      } else {
+        // Handle non-200 responses
+        print('Error: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      // Handle network or parsing errors
+      print('Error occurred while fetching data: $e');
+      return null;
+    }
+  }
+
+  void fetchData() async {
+    final String regcode = 'D000004';
+    final String startDate = '2024-11-01';
+    final String endDate = '2024-11-25';
+    final String companyid = '1';
+
+    final TopSalesManRes? result = await fetchTopSalesManData(
+      regcode: regcode,
+      startDate: startDate,
+      endDate: endDate,
+      companyid: companyid,
+    );
+
+    if (result != null) {
+      print('Status Code: ${result.statusCode}');
+      topSalesMan = result.data! ;
+      print('fhfdhgfh: ${json.encode(topSalesMan)}');
+    } else {
+      print('Failed to fetch data.');
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +218,18 @@ class DashBoardContent extends StatelessWidget {
 
                 _buildQuickStats(isTablet),
                 const SizedBox(height: 24),
-                _buildRevenueSection(isTablet),
+                FutureBuilder<Map<String, dynamic>>(
+                  future: _data,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      return _buildRevenueSection(true, snapshot.data!['data'], snapshot.data!['check_high_score']);
+                    } else if (snapshot.hasError) {
+                      return Text('Error: ${snapshot.error}');
+                    } else {
+                      return CircularProgressIndicator();
+                    }
+                  },
+                ),
                 const SizedBox(height: 24),
                 if (isTablet)
                   Row(
@@ -321,28 +529,28 @@ class DashBoardContent extends StatelessWidget {
       _StatItem(
         icon: Icons.shopping_cart,
         label: 'Total Orders',
-        value: '2,543',
+        value: '$totalOrder',
         growth: '+12.5%',
         color: Colors.blue,
       ),
       _StatItem(
         icon: Icons.person,
-        label: 'Active Users',
-        value: '1,234',
+        label: 'Total Invoices',
+        value: '$totalInvoices',
         growth: '+8.2%',
         color: Colors.green,
       ),
       _StatItem(
         icon: Icons.store,
-        label: 'Active Retailers',
-        value: '487',
+        label: 'Invoice Amount',
+        value: '$invAmt',
         growth: '+5.7%',
         color: Colors.purple,
       ),
       _StatItem(
         icon: Icons.pending_actions,
-        label: 'Outstanding',
-        value: '₹45.2K',
+        label: 'Receivable',
+        value: '₹$receivableBalance',
         growth: '-2.4%',
         color: Colors.orange,
         isNegative: true,
@@ -414,7 +622,7 @@ class DashBoardContent extends StatelessWidget {
               Text(
                 stat.value,
                 style: GoogleFonts.poppins(
-                  fontSize: 24,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -432,7 +640,53 @@ class DashBoardContent extends StatelessWidget {
     );
   }
 
-  Widget _buildRevenueSection(bool isTablet) {
+  Widget _buildRevenueSection(bool isTablet, List<dynamic> data, int checkHighScore) {
+    print("Data received: ${data.toString()}");
+
+    // Current date and last 7 days
+    final DateTime currentDate = DateTime.now();
+    final List<DateTime> last7Days = List.generate(
+      7,
+          (index) => currentDate.subtract(Duration(days: index)),
+    ).reversed.toList();
+
+    // Debug: Print last 7 days
+    print("Last 7 Days: ${last7Days.map((date) => date.toIso8601String()).toList()}");
+
+    // Prepare spots for distributor_count line chart
+    final List<FlSpot> distributorSpots = last7Days.map((date) {
+      final matchingData = data.firstWhere(
+            (item) =>
+        DateTime.parse(item['odate']).toLocal().year == date.year &&
+            DateTime.parse(item['odate']).toLocal().month == date.month &&
+            DateTime.parse(item['odate']).toLocal().day == date.day,
+        orElse: () => {'distributor_count': 0, 'retailer_count': 0},
+      );
+
+      final xValue = last7Days.indexOf(date).toDouble();
+      final yValue = matchingData['distributor_count']?.toDouble() ?? 0.0;
+
+      print("Distributor -> Date: ${date.toIso8601String()}, Count: $yValue");
+      return FlSpot(xValue, yValue);
+    }).toList();
+
+    // Prepare spots for retailer_count line chart
+    final List<FlSpot> retailerSpots = last7Days.map((date) {
+      final matchingData = data.firstWhere(
+            (item) =>
+        DateTime.parse(item['odate']).toLocal().year == date.year &&
+            DateTime.parse(item['odate']).toLocal().month == date.month &&
+            DateTime.parse(item['odate']).toLocal().day == date.day,
+        orElse: () => {'distributor_count': 0, 'retailer_count': 0},
+      );
+
+      final xValue = last7Days.indexOf(date).toDouble();
+      final yValue = matchingData['retailer_count']?.toDouble() ?? 0.0;
+
+      print("Retailer -> Date: ${date.toIso8601String()}, Count: $yValue");
+      return FlSpot(xValue, yValue);
+    }).toList();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -453,7 +707,7 @@ class DashBoardContent extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Revenue Overview',
+                'Distributor & Retailer Count Overview',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -467,10 +721,14 @@ class DashBoardContent extends StatelessWidget {
             height: 300,
             child: LineChart(
               LineChartData(
+                minY: 0,
+                maxY: checkHighScore.toDouble(),
+                minX: 0,
+                maxX: (last7Days.length - 1).toDouble(),
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval: 1,
+                  horizontalInterval: 2,
                   getDrawingHorizontalLine: (value) {
                     return FlLine(
                       color: Colors.grey[200],
@@ -484,18 +742,12 @@ class DashBoardContent extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 22,
+                      interval: 1,
                       getTitlesWidget: (value, meta) {
-                        const labels = [
-                          'Jan',
-                          'Feb',
-                          'Mar',
-                          'Apr',
-                          'May',
-                          'Jun'
-                        ];
-                        if (value.toInt() < labels.length) {
+                        final index = value.toInt();
+                        if (index >= 0 && index < last7Days.length) {
                           return Text(
-                            labels[value.toInt()],
+                            DateFormat('dd/MM').format(last7Days[index]),
                             style: TextStyle(
                               color: Colors.grey[600],
                               fontSize: 12,
@@ -509,9 +761,10 @@ class DashBoardContent extends StatelessWidget {
                   leftTitles: AxisTitles(
                     sideTitles: SideTitles(
                       showTitles: true,
+                      interval: 2,
                       getTitlesWidget: (value, meta) {
                         return Text(
-                          '${value.toInt()}K',
+                          '${value.toInt()}',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -530,21 +783,25 @@ class DashBoardContent extends StatelessWidget {
                 borderData: FlBorderData(show: false),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: const [
-                      FlSpot(0, 3),
-                      FlSpot(1, 4),
-                      FlSpot(2, 3.5),
-                      FlSpot(3, 5),
-                      FlSpot(4, 4),
-                      FlSpot(5, 6),
-                    ],
+                    spots: distributorSpots,
                     isCurved: true,
                     color: Colors.blue[700],
                     barWidth: 3,
-                    dotData: FlDotData(show: false),
+                    dotData: FlDotData(show: true),
                     belowBarData: BarAreaData(
                       show: true,
                       color: Colors.blue[700]!.withOpacity(0.1),
+                    ),
+                  ),
+                  LineChartBarData(
+                    spots: retailerSpots,
+                    isCurved: true,
+                    color: Colors.green[400],
+                    barWidth: 3,
+                    dotData: FlDotData(show: true),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: Colors.green[400]!.withOpacity(0.1),
                     ),
                   ),
                 ],
@@ -555,6 +812,7 @@ class DashBoardContent extends StatelessWidget {
       ),
     );
   }
+
 
   Widget _buildPeriodSelector() {
     return Container(
@@ -611,15 +869,19 @@ class DashBoardContent extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             child: DataTable(
               columns: const [
-                DataColumn(label: Text('Order ID')),
-                DataColumn(label: Text('Customer')),
+                DataColumn(label: Text('Code')),
+                DataColumn(label: Text('Name')),
                 DataColumn(label: Text('Status')),
                 DataColumn(label: Text('Amount')),
               ],
               rows: [
-                _buildOrderRow('12345', 'John Doe', 'Delivered', '₹2,500'),
-                _buildOrderRow('12346', 'Jane Smith', 'Pending', '₹1,800'),
-                _buildOrderRow('12347', 'Mike Johnson', 'Processing', '₹3,200'),
+                for (var salesMan in topSalesMan)
+                  _buildOrderRow(
+                    salesMan.regcode ?? 'N/A',       // Order Number or Region Code
+                    salesMan.sman ?? 'N/A',         // Salesman Name
+                    salesMan.status ?? 'Unknown',   // Order Status
+                    '₹${salesMan.invamt?.toString() ?? '0'}', // Invoice Amount
+                  ),
               ],
             ),
           ),
@@ -628,7 +890,7 @@ class DashBoardContent extends StatelessWidget {
     );
   }
 
-  DataRow _buildOrderRow(String orderId,
+  DataRow  _buildOrderRow(String orderId,
       String customer,
       String status,
       String amount,) {
@@ -740,6 +1002,207 @@ class DashBoardContent extends StatelessWidget {
   }
 }
 
+class QuickStatsCarousel extends StatefulWidget {
+  const QuickStatsCarousel({Key? key}) : super(key: key);
+
+  @override
+  _QuickStatsCarouselState createState() => _QuickStatsCarouselState();
+}
+
+class _QuickStatsCarouselState extends State<QuickStatsCarousel> {
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: 0, viewportFraction: 0.85);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildStatCard(_StatItem stat, bool isActive) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+      transform: Matrix4.identity()..scale(isActive ? 1.05 : 1.0), // Apply transform here
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: stat.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(stat.icon, color: stat.color),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: stat.isNegative
+                        ? Colors.red.withOpacity(0.1)
+                        : Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    stat.growth,
+                    style: TextStyle(
+                      color: stat.isNegative ? Colors.red : Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              stat.value,
+              style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              stat.label,
+              style: GoogleFonts.poppins(
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPageIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(
+        (stats.length / 3).ceil(),
+            (index) => Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _currentPage == index
+                ? Colors.blue
+                : Colors.grey.withOpacity(0.5),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 220, // Adjusted height to accommodate the cards
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: (int page) {
+              setState(() {
+                _currentPage = page;
+              });
+            },
+            itemCount: (stats.length / 3).ceil(),
+            itemBuilder: (context, pageIndex) {
+              // Calculate the start and end indices for the current page
+              int start = pageIndex * 3;
+              int end = start + 3;
+              List<_StatItem> pageStats = stats.sublist(
+                  start,
+                  end > stats.length ? stats.length : end
+              );
+
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: pageStats.map((stat) {
+                  int statIndex = stats.indexOf(stat);
+                  return Expanded(
+                    child: _buildStatCard(
+                        stat,
+                        statIndex == _currentPage * 3 ||
+                            statIndex == _currentPage * 3 + 1 ||
+                            statIndex == _currentPage * 3 + 2
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        _buildPageIndicator(),
+      ],
+    );
+  }
+
+  // Your existing _StatItem class remains the same
+  final List<_StatItem> stats = [
+    _StatItem(
+      icon: Icons.shopping_cart,
+      label: 'Total Orders',
+      value: '2,543',
+      growth: '+12.5%',
+      color: Colors.blue,
+    ),
+    _StatItem(
+      icon: Icons.person,
+      label: 'Active Users',
+      value: '1,234',
+      growth: '+8.2%',
+      color: Colors.green,
+    ),
+    _StatItem(
+      icon: Icons.store,
+      label: 'Active Retailers',
+      value: '487',
+      growth: '+5.7%',
+      color: Colors.purple,
+    ),
+    _StatItem(
+      icon: Icons.pending_actions,
+      label: 'Receivable',
+      value: '₹50,000',
+      growth: '-2.4%',
+      color: Colors.orange,
+      isNegative: true,
+    ),
+  ];
+}
+
+// Existing _StatItem class definition
 class _StatItem {
   final IconData icon;
   final String label;
@@ -748,7 +1211,7 @@ class _StatItem {
   final Color color;
   final bool isNegative;
 
-  const _StatItem({
+  _StatItem({
     required this.icon,
     required this.label,
     required this.value,

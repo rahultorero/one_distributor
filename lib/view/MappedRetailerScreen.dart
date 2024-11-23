@@ -323,9 +323,9 @@ class _MappedRetailerScreenState extends State<MappedRetailerScreen> {
       ),
       child: Column(
         children: [
-          _buildProductSection(mapping, "Product Details"),
+          _buildProductSection(mapping, "Retailer Details"),
           Divider(height: 1, color: Color(0xFFE2E8F0)),
-          _buildMappedProductSection(mapping, "Mapped Product Details"),
+          _buildMappedProductSection(mapping, "Mapped Retailer Details"),
           _buildCardActions(mapping),
         ],
       ),

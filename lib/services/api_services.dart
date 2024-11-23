@@ -43,7 +43,9 @@ class ApiConfig {
   static const String mapping_party = "/mapping_party";
   static const String get_mapping_retailer = "/get_mapping_retailer";
   static const String deleteMappingRetailer = "/deleteMappingRetailer";
-
+  static const String receivablePayable = "/receivablePayable";
+  static const String countOrder = "/countOrder";
+  static const String get_top_10_salesmen = "/get_top_10_salesmen";
 
 
   static String getHeader(){
@@ -190,4 +192,17 @@ class ApiConfig {
   static String reqDeleteRetailer(){
     return '$baseUrl$deleteMappingRetailer';
   }
+
+  static String reqDashboardReceivablePayable(){
+    return '$baseUrl$receivablePayable';
+  }
+
+  static String reqDashboardcountOrder(){
+    return '$baseUrl$countOrder';
+  }
+
+  static String reqGet_top_10_salesmen(){
+    return'$baseUrl$get_top_10_salesmen';
+  }
+
 }
