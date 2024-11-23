@@ -46,6 +46,7 @@ class ApiConfig {
   static const String receivablePayable = "/receivablePayable";
   static const String countOrder = "/countOrder";
   static const String get_top_10_salesmen = "/get_top_10_salesmen";
+  static const String get_top_100_product = "/get_top_100_product";
 
 
   static String getHeader(){
@@ -205,4 +206,7 @@ class ApiConfig {
     return'$baseUrl$get_top_10_salesmen';
   }
 
+  static String reqGet_top_100_product(){
+    return '$baseUrl$get_top_100_product';
+  }
 }

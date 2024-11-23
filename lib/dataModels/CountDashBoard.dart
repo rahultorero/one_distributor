@@ -4,9 +4,13 @@ class CountDashBoard {
   int? syncCount;
   int? notSyncCount;
   int? totalInvoice;
-  double? percentage;
-  double? invamt;
+  int? invamtprecentage;
+  int? invamt;
+  int? totalInvoicePercentage;
+  int? totalOrderPercentage;
   int? totalOrder;
+  double? totalOrderAmtPercentage;
+  double? totalAmtOrder;
 
   CountDashBoard(
       {this.message,
@@ -14,9 +18,13 @@ class CountDashBoard {
         this.syncCount,
         this.notSyncCount,
         this.totalInvoice,
-        this.percentage,
+        this.invamtprecentage,
         this.invamt,
-        this.totalOrder});
+        this.totalInvoicePercentage,
+        this.totalOrderPercentage,
+        this.totalOrder,
+        this.totalOrderAmtPercentage,
+        this.totalAmtOrder});
 
   CountDashBoard.fromJson(Map<String, dynamic> json) {
     message = json['message'];
@@ -24,9 +32,13 @@ class CountDashBoard {
     syncCount = json['syncCount'];
     notSyncCount = json['notSyncCount'];
     totalInvoice = json['totalInvoice'];
-    percentage = (json['percentage'] as num?)?.toDouble() ?? 0.0;
-    invamt =(json['invamt'] as num?)?.toDouble() ?? 0.0;
+    invamtprecentage = json['invamtprecentage'];
+    invamt = json['invamt'];
+    totalInvoicePercentage = json['totalInvoicePercentage'];
+    totalOrderPercentage = json['totalOrderPercentage'];
     totalOrder = json['totalOrder'];
+    totalOrderAmtPercentage = json['totalOrderAmtPercentage'];
+    totalAmtOrder = json['totalAmtOrder'];
   }
 
   Map<String, dynamic> toJson() {
@@ -36,9 +48,13 @@ class CountDashBoard {
     data['syncCount'] = this.syncCount;
     data['notSyncCount'] = this.notSyncCount;
     data['totalInvoice'] = this.totalInvoice;
-    data['percentage'] = this.percentage;
+    data['invamtprecentage'] = this.invamtprecentage;
     data['invamt'] = this.invamt;
+    data['totalInvoicePercentage'] = this.totalInvoicePercentage;
+    data['totalOrderPercentage'] = this.totalOrderPercentage;
     data['totalOrder'] = this.totalOrder;
+    data['totalOrderAmtPercentage'] = this.totalOrderAmtPercentage;
+    data['totalAmtOrder'] = this.totalAmtOrder;
     return data;
   }
 }
