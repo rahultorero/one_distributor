@@ -311,7 +311,7 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
                     Row(
                       children: [
                         SizedBox(
-                          width: 300, // Set your desired width here
+                          width: 280, // Set your desired width here
                           height: 50, // Set your desired height here
                           child: TextField(
                             controller: _remarkController,

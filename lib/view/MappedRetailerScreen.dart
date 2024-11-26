@@ -395,7 +395,7 @@ class _MappedRetailerScreenState extends State<MappedRetailerScreen> {
               Icon(Icons.science, size: 16, color: Color(0xFF64748B)),
               SizedBox(width: 4),
               Container(
-                width:130,
+                width:115,
                 child: Text(
                   product.partyEmail ?? "",
                   style: TextStyle(

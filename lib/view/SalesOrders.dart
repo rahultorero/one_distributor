@@ -203,11 +203,33 @@ class _SalesOrderListState extends State<SalesOrderList> {
     }
   }
 
+  // 817.3333333333334
+
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    print("screen width ${screenWidth}");
     // Adjust the tablet breakpoint to match your device
-    final isTablet = screenWidth >= 533;
+    final isTablet = screenWidth >= 600;
+    final isSmallScreen = screenWidth <= 360;
+
+    // Calculate dynamic card height based on screen height
+    // Assuming we want cards to take up roughly 1/3 of screen height on phones
+    // and 1/2 of that on tablets
+    final desiredCardHeight = isTablet
+        ? screenHeight * 0.405  // For tablets
+        : isSmallScreen
+        ? screenHeight * 0.252 // For phones
+        :screenHeight * 0.245;
+
+    // Calculate childAspectRatio dynamically
+    // childAspectRatio = width / height
+    // We need to account for the grid padding and margins
+    final horizontalPadding = 16.0; // Total horizontal padding (8 on each side)
+    final availableWidth = screenWidth - horizontalPadding;
+    final cardWidth = isTablet ? availableWidth / 2 : availableWidth;
+    final childAspectRatio = cardWidth / desiredCardHeight;
     return Scaffold(
       appBar: AppBar(
         title: Text('Sales Orders'),
@@ -232,7 +254,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
               );
             },
           ),
-          
+
         ],
       ),
       body: Container(
@@ -274,8 +296,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
               )
                   : GridView.builder(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: isTablet ? 2 : 1,
-                // Lower the childAspectRatio to increase the height of the card
-                childAspectRatio: isTablet ? 1.87:1.87, // Adjust this value to make the card taller
+                childAspectRatio: childAspectRatio,
                 crossAxisSpacing: 1,
                 mainAxisSpacing: 5,
               ),
@@ -447,6 +468,8 @@ class _SalesOrderListState extends State<SalesOrderList> {
       ),
     );
   }
+
+
   Color getStatusColor(String? status) {
     switch (status?.toUpperCase()) {
       case 'CHKED':  // Checked
@@ -945,16 +968,16 @@ class _OrderBottomSheetState extends State<OrderBottomSheet> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween, // Space between title and close button
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 10.0), // Add left margin here
+                      padding: const EdgeInsets.only(left: 8.0), // Add left margin here
                       child:
                       Row(
                         children: [
                           Container(
-                            width:200,
+                            width:192,
                             child:  Text(
                               '${widget.companyName}', // Heading
                               style: TextStyle(
-                                  fontSize: 15, // Font size for better visibility
+                                  fontSize: 14, // Font size for better visibility
                                   fontWeight: FontWeight.bold,
                                   color: Colors.black, // Change the color if needed
                                   overflow: TextOverflow.ellipsis                        ),

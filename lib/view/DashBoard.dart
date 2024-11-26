@@ -41,9 +41,8 @@ class _DashBoardContentState extends State<DashBoardContent> {
     fetchCountDashboard();
     _data = getDistributorRetailerData(
       'D000004',
-      '2024-11-16',
-      '2024-11-22',
-      'R000001',
+      '2024-11-15',
+      '2024-11-21'
     );
     fetchData();
   }
@@ -102,8 +101,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
       body: jsonEncode({
         "dist_id": regCode,
         "companyid": companyId,
-        "from_date":"2024-11-12",
-        "to_date":"2024-11-12"
+        "to_date":"2024-11-26"
       }),
     );
 
@@ -126,16 +124,17 @@ class _DashBoardContentState extends State<DashBoardContent> {
     }
   }
 
-  Future<Map<String, dynamic>> getDistributorRetailerData(String distid, String startDate, String endDate, String rid) async {
+  Future<Map<String, dynamic>> getDistributorRetailerData(String distid, String startDate, String endDate) async {
     final url = Uri.parse(
       'http://182.70.116.222:8000/get_distributor_retailer_comparison?'
-          'distid=$distid&startDate=$startDate&endDate=$endDate&rid=$rid',
+          'distid=$distid&startDate=$startDate&endDate=$endDate',
     );
 
     final response = await http.get(url);
 
     if (response.statusCode == 200) {
       final responseData = jsonDecode(response.body);
+      print("graph comparision ${responseData}");
       return {
         'data': responseData['data'],
         'check_high_score': responseData['check_high_score'],
@@ -266,7 +265,39 @@ class _DashBoardContentState extends State<DashBoardContent> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        bool isTablet = constraints.maxWidth > 600;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final screenHeight = MediaQuery.of(context).size.height;
+
+// Debugging print statement (optional, for development only)
+        print("Screen width: $screenWidth, Screen height: $screenHeight");
+
+// Adjust the tablet breakpoint to match your device
+        final isTablet = screenWidth >= 600;
+
+// Check for small screen widths (e.g., <= 360)
+        final isSmallScreen = screenWidth <= 360;
+
+// Calculate dynamic card height based on screen height
+// Adjust further for small screens
+        final desiredCardHeight = isTablet
+            ? screenHeight * 0.61 // For tablets
+            : isSmallScreen
+            ? screenHeight * 0.42 // Slightly taller cards for small screens
+            : screenHeight * 0.39; // Default for phones
+
+
+
+// Calculate childAspectRatio dynamically
+// childAspectRatio = width / height
+        const double horizontalPadding = 16.0; // Total horizontal padding (8 on each side)
+        final availableWidth = screenWidth - horizontalPadding;
+        final cardWidth = isTablet ? availableWidth / 2 : availableWidth;
+        final childAspectRatio = cardWidth / desiredCardHeight;
+
+// Debugging prints
+        print("Card Height: $desiredCardHeight");
+        print("Child Aspect Ratio: $childAspectRatio");
+
 
         return CustomScrollView(
           slivers: [
@@ -275,7 +306,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
                   _buildHeader(),
-                  _buildQuickStats(isTablet),
+                  _buildQuickStats(isTablet,childAspectRatio),
                   const SizedBox(height: 24),
                   FutureBuilder<Map<String, dynamic>>(
                     future: _data,
@@ -337,6 +368,8 @@ class _DashBoardContentState extends State<DashBoardContent> {
     // State variables for pagination
     final itemsPerPage = 10;
     final ValueNotifier<bool> showAllProducts = ValueNotifier(false);
+
+    
 
     return Container(
       height: 800,
@@ -704,7 +737,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
   }
 
 
-  Widget _buildQuickStats(bool isTablet) {
+  Widget _buildQuickStats(bool isTablet,double childAspectRatio) {
     final stats = [
       _StatItem(
         icon: Icons.shopping_cart,
@@ -742,9 +775,9 @@ class _DashBoardContentState extends State<DashBoardContent> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: isTablet ? 4 : 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: isTablet ? 1.14 : 1.05,
+        childAspectRatio: childAspectRatio,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
       ),
       itemCount: stats.length,
       itemBuilder: (context, index) {
@@ -1095,7 +1128,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
   }
   Widget _buildOrdersTable() {
     return Container(
-      height: 400, // Constrained height
+      height: 305, // Constrained height
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1530,16 +1563,17 @@ class _StatItem {
   });
 }
 
+
 class RevenueSection extends StatefulWidget {
-  final bool isTablet;
   final List<dynamic> data;
   final int checkHighScore;
+  final bool isTablet;
 
   const RevenueSection({
     Key? key,
-    required this.isTablet,
     required this.data,
     required this.checkHighScore,
+    this.isTablet = false,
   }) : super(key: key);
 
   @override
@@ -1563,18 +1597,14 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
   @override
   void dispose() {
     _animationController.dispose();
+    showComparison.dispose();
     super.dispose();
   }
 
-  // Modified getSpots function to include animation
-  List<FlSpot> getSpots(String countKey, List<DateTime> dates, List<dynamic> sourceData, double animationValue) {
-    return dates.map((date) {
-      final int index = dates.indexOf(date);
-      // Only show points up to the current animation value
-      if (index > (dates.length - 1) * animationValue) {
-        return FlSpot(index.toDouble(), 0);
-      }
-
+  // Improved getSpots function to ensure accurate plotting
+  List<FlSpot> getSpots(String countKey, List<DateTime> sortedDates, List<dynamic> sourceData, double animationValue) {
+    return sortedDates.asMap().map((index, date) {
+      // Find matching data for the specific date
       final matchingData = sourceData.firstWhere(
             (item) {
           final itemDate = DateTime.parse(item['odate']).toLocal();
@@ -1582,11 +1612,12 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
               itemDate.month == date.month &&
               itemDate.day == date.day;
         },
-        orElse: () => {countKey: 0},
+        orElse: () => null,
       );
 
+      // Extract value safely
       double value = 0.0;
-      if (matchingData[countKey] != null) {
+      if (matchingData != null && matchingData[countKey] != null) {
         value = (matchingData[countKey] is int)
             ? matchingData[countKey].toDouble()
             : (matchingData[countKey] is double)
@@ -1594,16 +1625,36 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
             : 0.0;
       }
 
-      // Smooth transition for the current animating point
-      final currentAnimatingIndex = ((dates.length - 1) * animationValue).floor();
-      if (index == currentAnimatingIndex) {
-        final animationProgress = ((dates.length - 1) * animationValue) - currentAnimatingIndex;
-        value = value * animationProgress;
+      // Improved animation logic
+      final totalPoints = sortedDates.length;
+      final normalizedAnimationValue = animationValue * (totalPoints - 1);
+
+      // Fully show the point if animation has reached or passed its index
+      if (index <= normalizedAnimationValue) {
+        // For the last point, ensure full visibility when animation is complete
+        if (index == totalPoints - 1 && animationValue == 1.0) {
+          return MapEntry(index, FlSpot(index.toDouble(), value));
+        }
+
+        // For points before the last, apply previous animation logic
+        if (index > normalizedAnimationValue) {
+          return MapEntry(index, FlSpot(index.toDouble(), 0));
+        }
+
+        // Smooth transition for points being animated
+        if (index == normalizedAnimationValue.floor()) {
+          final animationProgress = normalizedAnimationValue - normalizedAnimationValue.floor();
+          return MapEntry(index, FlSpot(index.toDouble(), value * animationProgress));
+        }
+
+        // Show full value for points before current animating point
+        return MapEntry(index, FlSpot(index.toDouble(), value));
       }
 
-      return FlSpot(index.toDouble(), value);
-    }).toList();
+      return MapEntry(index, FlSpot(index.toDouble(), 0));
+    }).values.toList();
   }
+
 
   Widget _buildLegendItem(String label, Color color) {
     return Row(
@@ -1631,11 +1682,10 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
-    final DateTime currentDate = DateTime.now();
-    final List<DateTime> last7Days = List.generate(
-      7,
-          (index) => currentDate.subtract(Duration(days: index)),
-    ).reversed.toList();
+    // Ensure dates are extracted and sorted from the input data
+    final List<DateTime> sortedDates = widget.data.map((item) {
+      return DateTime.parse(item['odate']).toLocal();
+    }).toSet().toList()..sort();
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1708,14 +1758,14 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
                   builder: (context, showRetailers, _) {
                     final distributorSpots = getSpots(
                         'distributor_count',
-                        last7Days,
+                        sortedDates,
                         widget.data,
                         _animationController.value
                     );
 
                     final retailerSpots = getSpots(
                         'retailer_count',
-                        last7Days,
+                        sortedDates,
                         widget.data,
                         _animationController.value
                     );
@@ -1723,13 +1773,15 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
                     return LineChart(
                       LineChartData(
                         minY: 0,
-                        maxY: widget.checkHighScore.toDouble(),
+                        maxY: widget.checkHighScore.toDouble() + 2, // Add some padding
                         minX: 0,
-                        maxX: (last7Days.length - 1).toDouble(),
+                        maxX: (sortedDates.length - 1).toDouble(),
                         gridData: FlGridData(
                           show: true,
                           drawVerticalLine: false,
-                          horizontalInterval: widget.checkHighScore > 10 ? widget.checkHighScore / 5 : 2,
+                          horizontalInterval: widget.checkHighScore > 10
+                              ? widget.checkHighScore / 5
+                              : 2,
                           getDrawingHorizontalLine: (value) {
                             return FlLine(
                               color: Colors.grey[200],
@@ -1746,13 +1798,13 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
                               interval: 1,
                               getTitlesWidget: (value, meta) {
                                 final index = value.toInt();
-                                if (index >= 0 && index < last7Days.length) {
+                                if (index >= 0 && index < sortedDates.length) {
                                   return Transform.rotate(
                                     angle: -0.5,
                                     child: SideTitleWidget(
                                       axisSide: meta.axisSide,
                                       child: Text(
-                                        DateFormat('dd/MM').format(last7Days[index]),
+                                        DateFormat('dd/MM').format(sortedDates[index]),
                                         style: TextStyle(
                                           color: Colors.grey[600],
                                           fontSize: 11,
@@ -1769,7 +1821,9 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
                           leftTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
-                              interval: widget.checkHighScore > 10 ? widget.checkHighScore / 5 : 2,
+                              interval: widget.checkHighScore > 10
+                                  ? widget.checkHighScore / 5
+                                  : 2,
                               reservedSize: 35,
                               getTitlesWidget: (value, meta) {
                                 return Padding(
@@ -1805,7 +1859,7 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
                               show: true,
                               getDotPainter: (spot, percent, barData, index) {
                                 // Only show dots for points that have been animated
-                                if (index > ((last7Days.length - 1) * _animationController.value)) {
+                                if (index > ((sortedDates.length - 1) * _animationController.value)) {
                                   return FlDotCirclePainter(
                                     radius: 0,
                                     color: Colors.transparent,
@@ -1837,7 +1891,7 @@ class _RevenueSectionState extends State<RevenueSection> with SingleTickerProvid
                                 show: true,
                                 getDotPainter: (spot, percent, barData, index) {
                                   // Only show dots for points that have been animated
-                                  if (index > ((last7Days.length - 1) * _animationController.value)) {
+                                  if (index > ((sortedDates.length - 1) * _animationController.value)) {
                                     return FlDotCirclePainter(
                                       radius: 0,
                                       color: Colors.transparent,

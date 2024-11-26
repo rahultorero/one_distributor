@@ -202,8 +202,28 @@ class _OutStandingListState extends State<OutStandingList> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    print("screen height ${screenHeight}");
     // Adjust the tablet breakpoint to match your device
-    final isTablet = screenWidth >= 533;
+    final isTablet = screenWidth >= 600;
+    final isSmallScreen = screenWidth <= 360;
+
+    // Calculate dynamic card height based on screen height
+    // Assuming we want cards to take up roughly 1/3 of screen height on phones
+    // and 1/2 of that on tablets
+    final desiredCardHeight = isTablet
+        ? screenHeight * 0.3  // For tablets
+        : isSmallScreen
+        ? screenHeight * 0.185
+        : screenHeight * 0.175; // For phones
+
+    // Calculate childAspectRatio dynamically
+    // childAspectRatio = width / height
+    // We need to account for the grid padding and margins
+    final horizontalPadding = 16.0; // Total horizontal padding (8 on each side)
+    final availableWidth = screenWidth - horizontalPadding;
+    final cardWidth = isTablet ? availableWidth / 2 : availableWidth;
+    final childAspectRatio = cardWidth / desiredCardHeight;
     return Scaffold(
       appBar: AppBar(
         title: Text('Outstanding Distributor'),
@@ -245,8 +265,7 @@ class _OutStandingListState extends State<OutStandingList> {
                   ? Center(child: LoadingIndicator())
                   : GridView.builder(gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: isTablet ? 2 : 1,
-                // Lower the childAspectRatio to increase the height of the card
-                childAspectRatio: isTablet ? 2.5:2.57, // Adjust this value to make the card taller
+                childAspectRatio: childAspectRatio,
                 crossAxisSpacing: 1,
                 mainAxisSpacing: 5,
               ),

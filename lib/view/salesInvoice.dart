@@ -594,18 +594,37 @@ class SalesInvoiceGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    print("screen height ${screenHeight}");
     // Adjust the tablet breakpoint to match your device
-    final isTablet = screenWidth >= 533;
+    final isTablet = screenWidth >= 600;
+    final isSmallScreen = screenWidth <= 360;
+
+    // Calculate dynamic card height based on screen height
+    // Assuming we want cards to take up roughly 1/3 of screen height on phones
+    // and 1/2 of that on tablets
+    final desiredCardHeight = isTablet
+        ? screenHeight * 0.42  // For tablets
+        : isSmallScreen
+        ? screenHeight * 0.305
+        : screenHeight * 0.275; // For phones
+
+    // Calculate childAspectRatio dynamically
+    // childAspectRatio = width / height
+    // We need to account for the grid padding and margins
+    final horizontalPadding = 16.0; // Total horizontal padding (8 on each side)
+    final availableWidth = screenWidth - horizontalPadding;
+    final cardWidth = isTablet ? availableWidth / 2 : availableWidth;
+    final childAspectRatio = cardWidth / desiredCardHeight;
 
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: isTablet ? 2 : 1,
-          // Adjusted aspect ratio for better height control
-          childAspectRatio: isTablet ? 1.79 : 1.65,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
+          childAspectRatio: childAspectRatio,
+          crossAxisSpacing: 1,
+          mainAxisSpacing: 5,
         ),
         itemCount: invoices.length,
         itemBuilder: (context, index) {
@@ -651,7 +670,7 @@ class SalesInvoiceGrid extends StatelessWidget {
                                         invoice.partyname ?? 'N/A',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: isTablet ? 14 : 16,
+                                          fontSize:  14 ,
                                           color: const Color(0xFF2D3748),
                                         ),
                                         maxLines: 1,

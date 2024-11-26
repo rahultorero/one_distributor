@@ -1048,7 +1048,7 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
                                               Expanded(
                                                 flex: 2,
                                                 child: Padding(
-                                                  padding: const EdgeInsets.all(8.0), // Added padding for better spacing
+                                                  padding: const EdgeInsets.only(top: 8,bottom: 8,left: 4,right: 0), // Added padding for better spacing
                                                   child: Row(
                                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                     children: [
@@ -2375,7 +2375,7 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
                 Row(
                   children: [
                     Container(
-                      width: 230,
+                      width: 210,
                       child:  Text("${product.dmfg}",style: TextStyle(fontSize: 12),),
                     ),
 
@@ -2572,7 +2572,7 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
           Icon(icon, size: 16, color: Colors.teal), // Icon for visual cue
           SizedBox(width: 8), // Spacing between icon and text
           Container(
-            width: 300,
+            width: 280,
             child: Column( // Use Column to allow for multi-line text
               crossAxisAlignment: CrossAxisAlignment.start, // Aligns text to the start
               children: [
