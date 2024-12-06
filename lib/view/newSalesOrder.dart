@@ -61,7 +61,7 @@ class NewSalesOrder extends StatefulWidget {
   _NewSalesOrderState createState() => _NewSalesOrderState();
 }
 
-class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProviderStateMixin {
+class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProviderStateMixin, WidgetsBindingObserver  {
   final _formKey = GlobalKey<FormState>();
   late TabController _tabController;
   Customer? _selectedCustomer;
@@ -96,6 +96,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   List<Customer> customerList = [];
   List<Party> retailerList = [];
   List<Product> productList = [];
+  List<WeeklyParty> weeklyList = [];
   List<DeliveryOption> deliveryOptions = [];
   ReceivableListRes? receivableList;
   FrequentlyPurchase? frequentlyList;
@@ -113,9 +114,14 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   bool _showTutorial = false; // Add this flag to control tutorial visibility
 
   bool _isExpanded = false;
+  bool isWeekly = false;
+  bool selectWeekly = false;
+  bool _showPreviousButton = false;
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     searchFocusNode = FocusNode();
     searchController = TextEditingController();
     print("NewSalesOrder State Initialized"); // Debug print
@@ -168,12 +174,12 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
     });
 
-
-
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
     selectAdd?.dispose();
     selectArea?.dispose();
     selectCity?.dispose();
@@ -202,6 +208,65 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     });
   }
 
+  // @override
+  // void didChangeAppLifecycleState(AppLifecycleState state) {
+  //   print("application status ${state}");
+  //   if (state == AppLifecycleState.detached || state == AppLifecycleState.paused) {
+  //     print("application is closed now !!!!!!!!!!!!!!!!!!!");
+  //     // Save cart items specifically when the app is being removed from background or killed
+  //     if(productListItem.isNotEmpty){
+  //       saveCartItems(productListItem);
+  //
+  //     }
+  //   }
+  // }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.resumed:
+        print("App is resumed");
+        break;
+      case AppLifecycleState.inactive:
+        print("App is inactive");
+        break;
+      case AppLifecycleState.paused:
+        if(productListItem.isNotEmpty){
+          print("App is paused");
+            saveCartItems(productListItem);
+        }
+
+        break;
+      case AppLifecycleState.detached:
+        print("App is detached");
+        break;
+      case AppLifecycleState.hidden:
+        print("App is hidden");
+        break;
+    }
+  }
+
+
+  Future<void> saveCartItems(List<ProductListItem> cartItems) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String cartJson = jsonEncode(cartItems.map((item) => item.toJson()).toList());
+    await prefs.setString('cart_items', cartJson);
+  }
+
+  Future<void> loadCartItems() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? cartJson = prefs.getString('cart_items');
+    if (cartJson != null) {
+      List<dynamic> cartData = jsonDecode(cartJson);
+      setState(() {
+        productListItem = cartData.map((item) => ProductListItem.fromJson(item)).toList();
+      });
+    }
+  }
+
+
+
   Future<void> fetchData() async {
     setState(() {
       isLoading = true; // Show loader
@@ -210,14 +275,20 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     print("check salesIdd ${smid}");
     print("check salesIdd ${_selectedCustomerId}");
     print("check salesIdd ${regCode}");
-    product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: "false",regCode: regCode!,smanId: smid!))!; // Then call the second function
+    print("check bolllll ${isWeekly}");
+    selectWeekly = isWeekly;
+    product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: isWeekly,regCode: regCode ?? "",smanId: smid ?? 0))!; // Then call the second function
+    print("already added product${json.encode(productListItem) }");
 
     for (var store in product.data!) {
       // Loop through each party in the party list of the store
-
+    
       retailerList = store.party!;
       productList = store.product!;
+      weeklyList = store.weeklyParty!;
     }
+
+
   }
 
   Future<void> _fetchDivisionAndCompanies() async {
@@ -226,6 +297,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       regCode = await _getDivision();
       smid = await _getsmid();
       userId = await _getUserId();
+      isWeekly = (await _getWeekly())!;
       if (regCode != null) {
         // Fetch companies using the division value
         stores = await fetchCompanies(regCode!);
@@ -343,7 +415,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       if (response.statusCode == 200) {
         // Decode the response as a map
         final Map<String, dynamic> data = jsonDecode(response.body);
-        print(response.body); // Log the response for debugging
+        print("ffffffff ${response.body}"); // Log the response for debugging
 
         // Parse the response into a ReceivableListRes object
         FrequentlyPurchase receivableListRes = FrequentlyPurchase.fromJson(data);
@@ -370,6 +442,9 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
         'ledid_party': _selectedRetailer?.ledidParty,
       };
 
+
+      print("sales loss body${ requestBody}");
+
       final response = await http.post(
         Uri.parse(ApiConfig.reqBouncedList()),
         headers: {'Content-Type': 'application/json'},
@@ -384,6 +459,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
 
         // Parse the response into a ReceivableListRes object
         FrequentlyPurchase receivableListRes = FrequentlyPurchase.fromJson(data);
+        print("check the saless losssss ${response.body}"); // Log the response for debugging
 
         // Return the list of Receivable objects
         return receivableListRes ; // Return an empty list if data is null
@@ -416,7 +492,12 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     return prefs.getInt("u_id"); // Replace with your key
   }
 
-  Future<PartyProductModel?> fetchPartyProductData({required int companyId, required String isWeekly, required String regCode, required int smanId}) async {
+  Future<bool?> _getWeekly() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getBool("isWeekly"); // Replace with your key
+  }
+
+  Future<PartyProductModel?> fetchPartyProductData({required int companyId, required bool isWeekly, required String regCode, required int smanId}) async {
 
 
     final String apiUrl = ApiConfig.reqPartyProduct();; // Replace with your API URL
@@ -428,6 +509,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       'reg_code': regCode,
       'smanid': smanId,
     };
+    
 
     print("checl party body ${requestBody}");
 
@@ -680,6 +762,102 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     });
   }
 
+  Widget selectionWidget({
+    required bool isWeekly,
+    required ValueChanged<bool> onSelectionChanged,
+  }) {
+    _showPreviousButton = true; // State to manage visibility of the Previous button
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.end, // Align to start
+          children: [
+            // 'Previous' Button
+            if (_showPreviousButton)
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _showPreviousButton = false; // Hide the button after clicking
+                    loadCartItems();
+
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade400,
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 1),
+                ),
+                child: Text(
+                  'Product',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            if (_showPreviousButton) SizedBox(width: 16), // Space after Previous button
+
+            // 'All' option
+            GestureDetector(
+              onTap: () => onSelectionChanged(false),
+              child: Semantics(
+                label: 'Select All option',
+                child: Row(
+                  children: [
+                    Icon(
+                      !isWeekly
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: !isWeekly ? Colors.green : Colors.grey,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'All',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: !isWeekly ? Colors.green : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(width: 20),
+
+            // 'Weekly' option
+            GestureDetector(
+              onTap: () => onSelectionChanged(true),
+              child: Semantics(
+                label: 'Select Weekly option',
+                child: Row(
+                  children: [
+                    Icon(
+                      isWeekly
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: isWeekly ? Colors.blue : Colors.grey,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      'Weekly',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: isWeekly ? Colors.blue : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -779,14 +957,14 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                               qty: items.qty ?? 0,
                               free: items.free,
                               schPercentage: "",
-                              rate: double.parse(items!.ptr ?? '0.0'),
-                              mrp: items?.mrp,
-                              ptr: items?.ptr,
+                              rate: items!.ptr ?? 0.0,
+                              mrp: items?.mrp.toString(),
+                              ptr: items?.ptr.toString(),
                               amount: "0",
                               remark: items.remark,
                               companyid: items.dCompanyid,
                               pid: items?.pid,
-                              stock: items.totalStock,
+                              stock: items.totalStock.toString(),
                               odid: 0,
                             ),
                           ];
@@ -854,14 +1032,14 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                               qty: items.qty ?? 0,
                               free: items.free,
                               schPercentage: "",
-                              rate: double.parse(items!.ptr ?? '0.0'),
-                              mrp: items?.mrp,
-                              ptr: items?.ptr,
+                              rate: items!.ptr ?? 0.0,
+                              mrp: items?.mrp.toString(),
+                              ptr: items?.ptr.toString(),
                               amount: "0",
                               remark: items.remark,
                               companyid: items.dCompanyid,
                               pid: items?.pid,
-                              stock: items.totalStock,
+                              stock: items.totalStock.toString(),
                               odid: 0,
                             ),
                           ];
@@ -943,6 +1121,16 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start, // Align children to the start
                                         children: [
+                                          if (!isWeekly)
+                                            selectionWidget(
+                                              isWeekly: selectWeekly,
+                                              onSelectionChanged: (value) {
+                                                setState(() {
+                                                  selectWeekly = value;
+                                                });
+                                              },
+                                            ),
+                                          SizedBox(height: 20,),
                                           _buildAnimatedDropdown<Customer>(
                                             'Customer Name',
                                             _selectedCustomer,
@@ -1162,7 +1350,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
                                                           companyid: _selectedProduct?.dCompanyid,
                                                           pid: _selectedProduct?.pid,
                                                           odid: 0,
-                                                          stock: _selectedProduct?.totalStock!
+                                                          stock: _selectedProduct!.totalStock.toString()
                                                       ),
 
                                                     ];
@@ -1422,12 +1610,13 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   }
 
   Future<void> fetchApi()async {
-    product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: "false",regCode: regCode!,smanId: smid!))!; // Then call the second function
+    product = (await fetchPartyProductData(companyId: _selectedCustomerId!,isWeekly: isWeekly,regCode: regCode!,smanId: smid!))!; // Then call the second function
 
     for(var product in product.data!){
       setState(() {
         retailerList = product.party!;
         productList = product.product!;
+        weeklyList = product.weeklyParty!;
       });
     }
 
@@ -1877,7 +2066,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
   void addProduct(ProductListItem orderItem) async {
     print("check the added itemss${orderItem.toJson()}");
     // Check if the item already exists in the list
-    final existingIndex = productListItem.indexWhere((item) => item.data?[0].pid == orderItem.data?[0].pid);
+    final existingIndex = productListItem.indexWhere((item) => item.data?[0].itemDetailid == orderItem.data?[0].itemDetailid);
 
     // If it exists, show confirmation sheet
     if (existingIndex != -1) {
@@ -1903,8 +2092,14 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
     final searchController = TextEditingController();
 
     List<Party> _filterRetailers(String query) {
+      // Choose the source list based on selectWeekly
+      List<Party> sourceList = selectWeekly
+          ? weeklyList.map((weeklyParty) => weeklyParty as Party).toList()
+          : retailerList;
+
+
       if (query.isEmpty) {
-        return retailerList;
+        return sourceList;
       }
 
       bool _matchesQuery(String? field, String query, {bool fullMatch = false}) {
@@ -1919,14 +2114,13 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       if (query.startsWith(' ') && !query.startsWith('  ')) {
         // One space: search in entire party name and party code
         String trimmedQuery = query.trim().toLowerCase();
-        return retailerList.where((retailer) =>
+        return sourceList.where((retailer) =>
         _matchesQuery(retailer.partyname, trimmedQuery, fullMatch: true) ||
-            _matchesQuery(retailer.partycode, trimmedQuery, fullMatch: true)
-        ).toList();
+            _matchesQuery(retailer.partycode, trimmedQuery, fullMatch: true)).toList();
       } else if (query.startsWith('  ')) {
         // Two spaces: search in all fields
         String trimmedQuery = query.trim().toLowerCase();
-        return retailerList.where((retailer) {
+        return sourceList.where((retailer) {
           return _matchesQuery(retailer.partyname, trimmedQuery, fullMatch: true) ||
               _matchesQuery(retailer.partycode, trimmedQuery, fullMatch: true) ||
               _matchesQuery(retailer.add1, trimmedQuery, fullMatch: true) ||
@@ -1938,12 +2132,12 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
         }).toList();
       } else {
         // Direct search: filter by first character of party name or party code
-        return retailerList.where((retailer) =>
+        return sourceList.where((retailer) =>
         _matchesQuery(retailer.partyname, query) ||
-            _matchesQuery(retailer.partycode, query)
-        ).toList();
+            _matchesQuery(retailer.partycode, query)).toList();
       }
     }
+
 
     showModalBottomSheet(
       context: context,
@@ -2098,6 +2292,8 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
       }).toList();
     }
 
+
+
     void _processSelectedProducts() {
 
       print("group code ${_selectGroupCode}");
@@ -2130,7 +2326,7 @@ class _NewSalesOrderState extends State<NewSalesOrder> with SingleTickerProvider
             remark: selectRemark?.text,
             companyid: items.dCompanyid,
             pid: items?.pid,
-            stock: items.totalStock,
+            stock: items.totalStock.toString(),
             odid: 0,
           ),
         ];
@@ -3041,7 +3237,7 @@ class _ProductListWidgetState extends State<ProductListWidget> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            product.name!,
+                            product.name ?? "",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -3250,7 +3446,8 @@ class _ProductListWidgetState extends State<ProductListWidget> {
         if (response.statusCode == 201 || response.statusCode == 200) {
           final responseBody = jsonDecode(response.body);
           print('Order submitted successfully: $responseBody');
-
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove("cart_items");
 
           // Navigate to another screen
           Navigator.pushAndRemoveUntil(
@@ -3374,14 +3571,16 @@ class _ProductListWidgetState extends State<ProductListWidget> {
         if (response.statusCode == 201 || response.statusCode == 200) {
           final responseBody = jsonDecode(response.body);
           print('Order submitted successfully: $responseBody');
-
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove("cart_items");
 
           // Navigate to another screen
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => DraftOrderList()), // Your target screen
-                (Route<dynamic> route) => false, // This removes all previous routes
+                (Route<dynamic> route) => route.isFirst, // Keep only the initial route in the stack
           );
+
 
         } else {
           print('Failed to submit order: ${response.statusCode}');

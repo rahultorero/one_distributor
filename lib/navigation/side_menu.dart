@@ -27,7 +27,7 @@ class SideMenu extends StatefulWidget {
 }
 
 class _SideMenuState extends State<SideMenu> {
-  final List<MenuItemModel> _browseMenuIcons = MenuItemModel.menuItems;
+  List<MenuItemModel> _browseMenuIcons = [];
   final List<MenuItemModel> _themeMenuIcon = MenuItemModel.menuItems3;
 
   String? _selectedMenu;
@@ -39,7 +39,15 @@ class _SideMenuState extends State<SideMenu> {
   @override
   void initState() {
     super.initState();
+    _loadMenuItems();
     getProfile();
+  }
+
+  Future<void> _loadMenuItems() async {
+    final items = await MenuItemModel.getMenuItems();
+    setState(() {
+      _browseMenuIcons = items;
+    });
   }
 
   Future<void> getProfile() async {
@@ -64,7 +72,9 @@ class _SideMenuState extends State<SideMenu> {
       await prefs.remove("u_id");
       await prefs.remove("companyId");
       await prefs.remove("smid");
-      await prefs.setBool("isLoggedIn", false);
+      await prefs.remove("isLoggedIn");
+      await prefs.remove("isWeekly");
+      await prefs.remove('cart_items');
 
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(

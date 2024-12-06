@@ -33,19 +33,20 @@ class FrequentlyItems {
   String? pname;
   String? packing;
   String? genericName;
-  String? totalQty;
-  String? totalStock;
+  int? totalQty;
+  int? totalStock;
   String? scheme;
   int? ptime;
   int? pcode;
   int? dCompanyid;
-  String? ptr;
-  double rate =  0.0;
-  String? mrp;
+  double? ptr;
+  double? rate =  0.0;
+  double? mrp;
   int qty = 0;
   int free = 0;
   String? remark;
   String? stock;
+  int? tqty;
   double get total => qty! * rate!;
 
   FrequentlyItems(
@@ -76,8 +77,9 @@ class FrequentlyItems {
     ptime = json['ptime'];
     pcode = json['pcode'];
     dCompanyid = json['d_companyid'];
-    ptr = json['ptr'];
-    mrp = json['mrp'];
+    ptr = (json['ptr'] is int ? (json['ptr'] as int).toDouble() : json['ptr'] as double?);
+    mrp = (json['mrp'] is int ? (json['mrp'] as int).toDouble() : json['mrp'] as double?);
+    tqty = json['tqty'];
   }
 
   Map<String, dynamic> toJson() {
@@ -95,6 +97,7 @@ class FrequentlyItems {
     data['d_companyid'] = this.dCompanyid;
     data['ptr'] = this.ptr;
     data['mrp'] = this.mrp;
+    data['tqty'] = this.tqty;
     return data;
   }
 }

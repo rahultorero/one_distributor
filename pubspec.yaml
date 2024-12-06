@@ -57,6 +57,7 @@ dependencies:
   open_file: ^3.2.1      # or the latest version
   fl_chart: ^0.65.0
   google_fonts: ^6.2.1
+  carousel_slider: ^5.0.0
 
 dev_dependencies:
   flutter_test:

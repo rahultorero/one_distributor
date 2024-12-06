@@ -43,6 +43,7 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
   String? formattedStartDate;
   String? formattedEndDate;
   String? regCode;
+  String? grpCode;
   List<Store> stores = [];
   bool isLoading = true; // To manage loading state
   @override
@@ -83,6 +84,7 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
     try {
       // Fetch division
       regCode = await _getDivision();
+      grpCode = await _getGroupCode();
       if (regCode != null) {
         // Fetch companies using the division value
         stores = await fetchCompanies(regCode!);
@@ -116,10 +118,10 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
     String? toDate = (formattedEndDate != null && formattedEndDate!.isNotEmpty) ? formattedEndDate : formatDate(today);
 
     final body = jsonEncode({
-      "regcode": regCode?.substring(0, 7),
+      "regcode":grpCode!.isNotEmpty ? grpCode : (regCode?.substring(0, 7) ?? ''),
       "company_id": selectedCompanyId,
       "pagenum": 1,
-      "pagesize": 20,
+      "pagesize": 50,
       "from": fromDate,  // Use the derived fromDate
       "to": toDate,      // Use the derived toDate
       "order_key": "AA.invno",
@@ -555,6 +557,12 @@ class _SalesInvoiceScreenState extends State<SalesInvoiceScreen> {
     return prefs.getString("reg_code"); // Replace with your key
   }
 
+  Future<String?> _getGroupCode() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    print("check the value ${prefs.getString("reg_code")}");
+    return prefs.getString("grpCode"); // Replace with your key
+  }
+
   // Helper method for Date Picker
 
   Widget _buildDateField(BuildContext context, {
@@ -604,7 +612,7 @@ class SalesInvoiceGrid extends StatelessWidget {
     // Assuming we want cards to take up roughly 1/3 of screen height on phones
     // and 1/2 of that on tablets
     final desiredCardHeight = isTablet
-        ? screenHeight * 0.42  // For tablets
+        ? screenHeight * 0.20  // For tablets
         : isSmallScreen
         ? screenHeight * 0.305
         : screenHeight * 0.275; // For phones
@@ -1205,7 +1213,7 @@ class InvoiceDetailsBottomSheet extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "${product?.pname} (${product?.packUnit}${product?.packageUnit})" ?? 'N/A',
+                              "${product?.pname} (${product?.package})" ?? 'N/A',
                               style: TextStyle(
                                   fontWeight: FontWeight.bold, fontSize: 16),
                             ),
@@ -1286,12 +1294,13 @@ class InvoiceDetailsBottomSheet extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        '₹${(product?.qty ?? 0) * (product?.rate ?? 0)}',
+                                        '₹${((product?.qty ?? 0) * (product?.rate ?? 0)).toStringAsFixed(2)}',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.blue,
                                         ),
-                                      ),
+                                      )
+                                      ,
                                     ],
                                   ),
                                 ],

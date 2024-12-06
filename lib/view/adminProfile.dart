@@ -50,6 +50,7 @@ class _AdminProfileState extends State<AdminProfile> {
   bool _isLoading = false; // Add a loading state flag
   String profilePic = "";
   int u_id = 0;
+  bool _isWeekly = false;
 
   @override
   void initState() {
@@ -81,7 +82,7 @@ class _AdminProfileState extends State<AdminProfile> {
       userCode = profileModel!.data?.duNo ?? 'N/A'; // Use default if null
       businessTpe = profileModel!.data?.businessType ?? 'Unknown'; // Use default if null
       profilePic = profileModel!.data?.urlPhoto ?? ''; // Safely handle null
-
+      _isWeekly = profileModel!.data!.isWeekly!;
       // Safely handle optional fields like DOB and wedding date
       _selectedDOB = profileModel!.data?.dob != null
           ? formatDateFromIso(profileModel!.data!.dob!)
@@ -148,7 +149,8 @@ class _AdminProfileState extends State<AdminProfile> {
       "wad": _selectedMarriageDate,
       "url_photo": imageUrl,
       "isactive":true,
-      "wnote": _welcomeNoteController.text
+      "wnote": _welcomeNoteController.text,
+      "isweekly" : _isWeekly
     };
 
     print("checking modelss ${body}");
@@ -211,7 +213,8 @@ class _AdminProfileState extends State<AdminProfile> {
       "wad": "2024-05-22",
       "isactive":true,
       "url_photo": profilePic,
-      "wnote": _welcomeNoteController.text
+      "wnote": _welcomeNoteController.text,
+      "isweekly" : _isWeekly
     };
 
     print("checking modelss ${body}");
@@ -654,11 +657,61 @@ class _AdminProfileState extends State<AdminProfile> {
                   // Date of Birth and Marriage Date
                   _buildDateField(context, 'Date of Birth', _selectedDOB ),
                   _buildDateField(context, 'Marriage Date', _selectedMarriageDate ),
+                  buildSwitchWithLabel(
+                    value: _isWeekly,
+                    onChanged: (newValue) {
+                      setState(() {
+                        _isWeekly = newValue;
+                      });
+                    },
+                  ),
                 ],
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget buildSwitchWithLabel({
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    String label = 'isWeekly',
+    IconData icon = Icons.toggle_off_outlined,
+  }) {
+    // Text style for the label
+    final TextStyle labelStyle = TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+      color: Colors.white,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 24,
+            color: Colors.white,
+          ),
+          SizedBox(width: 10), // Space between icon and text
+          Text(
+            label,
+            style: labelStyle,
+          ),
+          SizedBox(width: 80), // Space between text and switch
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: Colors.green,
+            inactiveThumbColor: Colors.red,
+            activeTrackColor: Colors.green.withOpacity(0.5),
+            inactiveTrackColor: Colors.red.withOpacity(0.5),
+          ),
+        ],
       ),
     );
   }

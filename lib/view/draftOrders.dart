@@ -166,6 +166,8 @@ class _DraftOrderListState extends State<DraftOrderList> {
             filteredOrders = orders; // Initialize filtered orders
           });
 
+          print("details here ${ json.encode(orders[0].details) }");
+
           print('Order fetched successfully: ${orders.length} orders found.');
         } else {
           // Handle unexpected response formats
@@ -198,7 +200,7 @@ class _DraftOrderListState extends State<DraftOrderList> {
     // Assuming we want cards to take up roughly 1/3 of screen height on phones
     // and 1/2 of that on tablets
     final desiredCardHeight = isTablet
-        ? screenHeight * 0.35  // For tablets
+        ? screenHeight * 0.165  // For tablets
         :isSmallScreen
         ? screenHeight * 0.22
         : screenHeight * 0.21; // For phones
@@ -398,7 +400,7 @@ class _DraftOrderListState extends State<DraftOrderList> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraftOrderBottomSheet(ocId: order.ohid!,orderId: order.orderNo,companyName: order.partyName,),
+      builder: (context) => DraftOrderBottomSheet(ocId: order.ohid!,orderId: order.orderNo,companyName: order.partyName,regcode: regCode ?? "",),
     );
   }
 
@@ -723,7 +725,8 @@ class DraftOrderBottomSheet extends StatefulWidget {
   final int ocId;
   final String orderId;
   final String companyName;
-  const DraftOrderBottomSheet({Key? key, required this.ocId, required this.orderId,required this.companyName}) : super(key: key);
+  final String regcode;
+  const DraftOrderBottomSheet({Key? key, required this.ocId, required this.orderId,required this.companyName,required this.regcode}) : super(key: key);
 
   @override
   _OrderBottomSheetState createState() => _OrderBottomSheetState();
@@ -896,7 +899,7 @@ class _OrderBottomSheetState extends State<DraftOrderBottomSheet> {
     // Prepare the body including 'ohid' and 'reg_code'
     final body = {
       'ohid': widget.ocId, // Use ocId as 'ohid'
-      'reg_code': 'D000004',
+      'reg_code': widget.regcode,
     };
 
     try {

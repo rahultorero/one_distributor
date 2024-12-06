@@ -123,7 +123,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
     print("check the updateee ${json.encode(widget.productListItem)}");
     if (widget.productListItem.length != _previousItemCount) {
       _badgeController.forward(from: 0.0);
-      _previousItemCount =widget.productListItem.length ?? 0;
+      _previousItemCount = widget.productListItem.length ?? 0;
       print("lenghthhhhhh${widget.productListItem.length}");
     }
   }
@@ -160,6 +160,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
 
 
   Widget _buildPanelContent(BuildContext context) {
+
     double panelHeight = MediaQuery.of(context).size.height * 0.91;
     final size = MediaQuery.of(context).size;
 
@@ -246,7 +247,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
   Widget build(BuildContext context) {
     double panelHeight = MediaQuery.of(context).size.height * 0.9;
     final size = MediaQuery.of(context).size;
-
+    print("watchhh lenght ${widget.productListItem.length}");
     return Stack(
       children: [
         widget.child,
@@ -312,7 +313,7 @@ class _SlidingProductPanelState extends State<SlidingProductPanel>
                                           ],
                                         ),
                                         child: Text(
-                                          '${widget.productListItem.length ?? 0}',
+                                          '${widget.productListItem.length}',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 12,

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ffi';
 import 'dart:math';
 
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:distributers_app/dataModels/CountDashBoard.dart';
 import 'package:distributers_app/dataModels/TopProductRes.dart';
 import 'package:distributers_app/dataModels/TopSalesManRes.dart';
@@ -14,6 +15,14 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../dataModels/OutStandingDashBoard.dart';
+import '../dataModels/TopParrtiesRes.dart';
+
+class Retailer {
+  String? name;
+  double? totalSales;
+  double? percentageGrowth;
+}
+
 class DashBoardContent extends StatefulWidget {
   const DashBoardContent({Key? key}) : super(key: key);
 
@@ -25,27 +34,78 @@ class _DashBoardContentState extends State<DashBoardContent> {
   late Future<OutStandingDashBoard> _dashboardFuture;
   double receivableBalance = 0.0;
   double payableBalance = 0.0;
-  int totalOrder = 0;
-  int totalInvoices = 0;
-  int invAmt = 0;
+  num totalOrder = 0;
+  num orderAmount = 0.0;
+  num totalInvoices = 0;
+  num invAmt = 0.0;
+  num totalOrderPer = 0.0;
+  num OrderAmtPer = 0.0;
+  num totalInvoicePer = 0.0;
+  num InvoiceAmtPer = 0.0;
   late Future<Map<String, dynamic>> _data;
   List<TopSalesMan> topSalesMan = [];
   List<TopProduct> topProduct = [];
-
-
-
+  List<TopParties> topParties = [];
+  late DateTime _selectedDate;
+  String formattedToday = "";
+  String formattedSixDaysAgo = "";
+  bool isTablet = false;
   @override
   void initState() {
     super.initState();
+    _selectedDate = DateTime.now().subtract(const Duration(days: 1));
+    final DateTime today = DateTime.now();
+    final DateTime sixDaysAgo = today.subtract(Duration(days: 6));
+
+    formattedToday = DateFormat('yyyy-MM-dd').format(today);
+    formattedSixDaysAgo = DateFormat('yyyy-MM-dd').format(sixDaysAgo);
     fetchOutStandingDashboard(); // Initialize the API call
     fetchCountDashboard();
     _data = getDistributorRetailerData(
-      'D000004',
-      '2024-11-15',
-      '2024-11-21'
+      formattedSixDaysAgo,
+      formattedToday
     );
     fetchData();
   }
+
+  Future<void> _selectDate(BuildContext context) async {
+    DateTime today = DateTime.now();
+
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000), // You can adjust this as needed
+      lastDate: today, // Restrict to today
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue[700]!,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _selectedDate) {
+      setState(() {
+        _selectedDate = picked;
+        print("check the date ${ DateFormat('yyyy-MM-dd').format(_selectedDate)}");
+        fetchOutStandingDashboard(); // Initialize the API call
+        fetchCountDashboard();
+        fetchData();
+
+      });
+    }
+  }
+
+  Future<String?> _getDivision() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    print("check the value ${prefs.getString("reg_code")}");
+    return prefs.getString("reg_code"); // Replace with your key
+  }
+
 
   Future<void> fetchOutStandingDashboard() async {
     // Get reg_code and companyId from shared preferences
@@ -87,6 +147,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
     // Get reg_code and companyId from shared preferences
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? regCode = prefs.getString('reg_code');
+    final String? grpCode = prefs.getString('grpCode');
     final int? companyId = prefs.getInt('companyId');
 
     // Check if values are null
@@ -99,13 +160,13 @@ class _DashBoardContentState extends State<DashBoardContent> {
       Uri.parse(ApiConfig.reqDashboardcountOrder()), // Replace with your endpoint
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        "dist_id": regCode,
+        "regcode":grpCode!.isNotEmpty ? grpCode : (regCode?.substring(0, 7) ?? ''),
         "companyid": companyId,
-        "to_date":"2024-11-26"
+        "toDate": DateFormat('yyyy-MM-dd').format(_selectedDate)
       }),
     );
 
-    print("check body ${regCode} ${companyId}");
+    print("check body count ${response.body} ${DateFormat('yyyy-MM-dd').format(_selectedDate)}");
 
     if (response.statusCode == 200) {
       print("HERE");
@@ -116,6 +177,11 @@ class _DashBoardContentState extends State<DashBoardContent> {
         invAmt = outstanding.invamt ?? 0;
         totalOrder = outstanding.totalOrder ?? 0;
         totalInvoices = outstanding.totalInvoice ?? 0;
+        orderAmount = outstanding.totalAmtOrder ?? 0.0;
+        totalOrderPer = outstanding.totalOrderPercentage ?? 0.0;
+        OrderAmtPer = outstanding.totalOrderAmtPercentage ?? 0.0;
+        totalInvoicePer = outstanding.totalInvoicePercentage ?? 0.0;
+        InvoiceAmtPer = outstanding.invamtprecentage ?? 0.0;
       });
       print("hhhhhhhhhhhhhhhhhhhhhhhhhhhh:   ${totalOrder}");
       print("check the dashboard outstanding data ${jsonResponse}");
@@ -124,10 +190,15 @@ class _DashBoardContentState extends State<DashBoardContent> {
     }
   }
 
-  Future<Map<String, dynamic>> getDistributorRetailerData(String distid, String startDate, String endDate) async {
+  Future<Map<String, dynamic>> getDistributorRetailerData(String startDate, String endDate) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? grpCode = prefs.getString('grpCode');
+    final String? regCode = prefs.getString('reg_code');
+    final int? companyId = prefs.getInt('companyId');
+    final code = grpCode!.isNotEmpty ? grpCode : (regCode?.substring(0, 7) ?? '');
     final url = Uri.parse(
       'http://182.70.116.222:8000/get_distributor_retailer_comparison?'
-          'distid=$distid&startDate=$startDate&endDate=$endDate',
+          'regcode=$code&fromDate=$startDate&toDate=$endDate&companyid=$companyId',
     );
 
     final response = await http.get(url);
@@ -145,23 +216,23 @@ class _DashBoardContentState extends State<DashBoardContent> {
   }
 
 
-  Future<TopSalesManRes?> fetchTopSalesManData({
+  Future<TopPartiesRes?> fetchTopPartiesData({
     required String regcode,
     required String startDate,
-    required String endDate,
     required String companyid,
   }) async {
-    final String baseUrl = ApiConfig.reqGet_top_10_salesmen(); // Replace with your API URL
+    final String baseUrl = ApiConfig.reqGet_top_10_parties(); // Replace with your API URL
 
     // Construct query parameters
     final Map<String, String> queryParams = {
       'regcode': regcode,
-      'startDate': startDate,
-      'endDate': endDate,
+      'toDate': startDate,
       'companyid': companyid,
     };
 
     final Uri uri = Uri.parse(baseUrl).replace(queryParameters: queryParams);
+
+    print("parties body${queryParams}");
 
     try {
       // API call
@@ -171,6 +242,48 @@ class _DashBoardContentState extends State<DashBoardContent> {
       if (response.statusCode == 200) {
         // Parse the JSON response
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        print("parties data${jsonResponse}");
+        return TopPartiesRes.fromJson(jsonResponse);
+      } else {
+        // Handle non-200 responses
+        print('Error: ${response.statusCode} - ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      // Handle network or parsing errors
+      print('Error occurred while fetching data: $e');
+      return null;
+    }
+  }
+
+
+  Future<TopSalesManRes?> fetchTopSalesManData({
+    required String regcode,
+    required String startDate,
+    required String companyid,
+  }) async {
+    final String baseUrl = ApiConfig.reqGet_top_10_salesmen(); // Replace with your API URL
+
+    // Construct query parameters
+    final Map<String, String> queryParams = {
+      'regcode': regcode,
+      'toDate': startDate,
+      'companyid': companyid,
+    };
+
+    final Uri uri = Uri.parse(baseUrl).replace(queryParameters: queryParams);
+
+    print("sales body${queryParams}");
+
+    try {
+      // API call
+      final http.Response response = await http.get(uri);
+
+      // Check for successful response
+      if (response.statusCode == 200) {
+        // Parse the JSON response
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        print("salesman data${jsonResponse}");
         return TopSalesManRes.fromJson(jsonResponse);
       } else {
         // Handle non-200 responses
@@ -194,6 +307,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
     final Map<String, String> queryParams = {
       'regcode': regcode,
       'companyid': companyid,
+      'toDate': DateFormat('yyyy-MM-dd').format(_selectedDate)
     };
 
     final Uri uri = Uri.parse(baseUrl).replace(queryParameters: queryParams);
@@ -223,15 +337,17 @@ class _DashBoardContentState extends State<DashBoardContent> {
 
 
   void fetchData() async {
-    final String regcode = 'D000004';
-    final String startDate = '2024-11-01';
-    final String endDate = '2024-11-25';
-    final String companyid = '1';
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? grpCode = prefs.getString('grpCode');
+    final String? regCode = prefs.getString('reg_code');
+    final int? companyId = prefs.getInt('companyId');
+    final code = grpCode!.isNotEmpty ? grpCode : (regCode?.substring(0, 7) ?? '');
+    final String startDate =  DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final String companyid = companyId.toString();
 
     final TopSalesManRes? result = await fetchTopSalesManData(
-      regcode: regcode,
+      regcode: code!,
       startDate: startDate,
-      endDate: endDate,
       companyid: companyid,
     );
 
@@ -245,7 +361,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
 
 
     final TopProductRes? resultPr = await fetchTopProductData(
-      regcode: regcode,
+      regcode: regCode ?? "",
       companyid: companyid,
     );
 
@@ -258,12 +374,29 @@ class _DashBoardContentState extends State<DashBoardContent> {
     } else {
       print('Failed to fetch data.');
     }
+
+    final TopPartiesRes? resultParty = await fetchTopPartiesData(
+      regcode: regCode!,
+      startDate: startDate,
+      companyid: companyid,
+    );
+
+    if (resultPr != null) {
+      print('Status Code: ${resultParty?.statusCode}');
+      setState(() {
+        topParties = resultParty!.data! ;
+      });
+      print('fhfdhgfh: ${json.encode(topProduct)}');
+    } else {
+      print('Failed to fetch data.');
+    }
   }
 
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
+    return
+      LayoutBuilder(
       builder: (context, constraints) {
         final screenWidth = MediaQuery.of(context).size.width;
         final screenHeight = MediaQuery.of(context).size.height;
@@ -272,7 +405,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
         print("Screen width: $screenWidth, Screen height: $screenHeight");
 
 // Adjust the tablet breakpoint to match your device
-        final isTablet = screenWidth >= 600;
+        isTablet = screenWidth >= 600;
 
 // Check for small screen widths (e.g., <= 360)
         final isSmallScreen = screenWidth <= 360;
@@ -280,7 +413,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
 // Calculate dynamic card height based on screen height
 // Adjust further for small screens
         final desiredCardHeight = isTablet
-            ? screenHeight * 0.61 // For tablets
+            ? screenHeight * 0.35 // For tablets
             : isSmallScreen
             ? screenHeight * 0.42 // Slightly taller cards for small screens
             : screenHeight * 0.39; // Default for phones
@@ -298,67 +431,72 @@ class _DashBoardContentState extends State<DashBoardContent> {
         print("Card Height: $desiredCardHeight");
         print("Child Aspect Ratio: $childAspectRatio");
 
+       return RefreshIndicator(
+            onRefresh: () async {
+              // Implement your refresh logic here
+              try {
+                // Fetch new data
+                setState(() {
+                  _data = getDistributorRetailerData(formattedSixDaysAgo, formattedToday); // Assuming this is your data fetching method
+                  fetchOutStandingDashboard(); // Initialize the API call
+                  fetchCountDashboard();
+                  fetchData();
+                });
 
-        return CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.only(top: 100, left: 24, right: 24, bottom: 24),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  _buildHeader(),
-                  _buildQuickStats(isTablet,childAspectRatio),
-                  const SizedBox(height: 24),
-                  FutureBuilder<Map<String, dynamic>>(
-                    future: _data,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasData) {
-                        return
-                        RevenueSection(isTablet:isTablet,data:snapshot.data!['data'],checkHighScore: snapshot.data!['check_high_score']);
-                      } else if (snapshot.hasError) {
-                        return Text('Error: ${snapshot.error}');
-                      } else {
-                        return Center(child: CircularProgressIndicator());
-                      }
-                    },
+                // Optional: You can add a small delay to show the refresh animation
+                await Future.delayed(Duration(milliseconds: 500));
+              } catch (e) {
+                // Handle any errors during refresh
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to refresh. Please try again.'),
+                    backgroundColor: Colors.red,
                   ),
-
-                ]),
-              ),
-            ),
-            if (isTablet)
+                );
+              }
+            },
+          child: CustomScrollView(
+            slivers: [
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                sliver: SliverToBoxAdapter(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: _buildOrdersTable()),
-                      const SizedBox(width: 24),
-                      Expanded(child: _buildActiveRetailers()),
-                    ],
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: const EdgeInsets.only(top: 100, left: 24, right: 24, bottom: 24),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    _buildOrdersTable(),
+                    _buildHeader(),
+                    _buildQuickStats(isTablet,childAspectRatio),
                     const SizedBox(height: 24),
-                    _buildActiveRetailers(),
+                    const SizedBox(height: 24),
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _data,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          return
+                            RevenueSection(isTablet:isTablet,data:snapshot.data!['data'],checkHighScore: snapshot.data!['check_high_score']);
+                        } else if (snapshot.hasError) {
+                          return Text('Error: ${snapshot.error}');
+                        } else {
+                          return Center(child: CircularProgressIndicator());
+                        }
+                      },
+                    ),
+
                   ]),
                 ),
               ),
 
-            SliverPadding(
-              padding: const EdgeInsets.all(24),
-              sliver: SliverToBoxAdapter(
-                child: _buildProductPerformance(isTablet),
+              SliverPadding(
+                padding: const EdgeInsets.all(24),
+                sliver: SliverToBoxAdapter(
+                  child:
+                  topProduct.isEmpty
+                      ?Text("")
+                      :
+                  _buildProductPerformance(isTablet),
+                ),
               ),
-            ),
-          ],
+            ],
+          ) ,
         );
+
       },
     );
   }
@@ -368,8 +506,8 @@ class _DashBoardContentState extends State<DashBoardContent> {
     // State variables for pagination
     final itemsPerPage = 10;
     final ValueNotifier<bool> showAllProducts = ValueNotifier(false);
-
-    
+    final PageController _carouselController = PageController();
+    final ValueNotifier<int> _currentPage = ValueNotifier<int>(0);
 
     return Container(
       height: 800,
@@ -386,31 +524,103 @@ class _DashBoardContentState extends State<DashBoardContent> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Product Performance',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              TextButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.download),
-                label: const Text('Export'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
           Expanded(
+            child: PageView(
+              controller: _carouselController,
+              onPageChanged: (index) {
+                _currentPage.value = index;
+              },
+              children: [
+                // First Page: Product Performance
+                _buildProductPerformanceContent(
+                  showAllProducts: showAllProducts,
+                  itemsPerPage: itemsPerPage,
+                ),
+
+                // Second Page: Top Retailers
+                if (topParties.isNotEmpty) _buildTopRetailersContent(),
+
+                // Third Page: Sales Summary
+                _buildTopSalesmanContent(),
+              ],
+            ),
+          ),
+          // Pagination Indicators
+          Padding(
+            padding: const EdgeInsets.only(top: 16.0),
+            child: ValueListenableBuilder<int>(
+              valueListenable: _currentPage,
+              builder: (context, currentPage, child) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (index) {
+                    return GestureDetector(
+                      onTap: () {
+                        _carouselController.animateToPage(
+                          index,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      },
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: index == currentPage
+                              ? Colors.blue
+                              : Colors.grey[300],
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Product Performance Content
+  Widget _buildProductPerformanceContent({
+    required ValueNotifier<bool> showAllProducts,
+    required int itemsPerPage
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Product Performance',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.download),
+              label: const Text('Export'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+        Expanded(
+          child: Scrollbar(
+            thumbVisibility: true,
+            trackVisibility: true,
+            interactive: true,
+            thickness: 8,
             child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
+              scrollDirection: Axis.horizontal,
               child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+                scrollDirection: Axis.vertical,
                 child: ValueListenableBuilder<bool>(
                   valueListenable: showAllProducts,
                   builder: (context, showAll, child) {
@@ -433,20 +643,31 @@ class _DashBoardContentState extends State<DashBoardContent> {
                           ],
                           rows: displayedProducts.map((product) {
                             return DataRow(cells: [
-                              DataCell(Text(product.pname ?? "")),
-                              DataCell(Text(product.productCount.toString())),
-                              DataCell(Text('₹63.4L')),
+                              DataCell(
+                                SizedBox(
+                                  width: 150,
+                                  child: Text(
+                                    product.pname ?? 'N/A',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontWeight: FontWeight.normal),
+                                  ),
+                                ),
+                              ),
+                              DataCell(Text(product.productQuantity.toString())),
+                              DataCell(Text(product.grsamt.toString())),
                               DataCell(
                                 Text(
-                                  '+8.7%',
+                                  '${product.percentagediff?.toStringAsFixed(2)}%',
                                   style: TextStyle(
-                                    color: '+8.7%'.startsWith('+') ? Colors.green : Colors.red,
+                                    color: '${product.percentagediff}%'.startsWith('+')
+                                        ? Colors.green
+                                        : Colors.red,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
-                              DataCell(Text('82')),
-                              DataCell(_buildStockStatus('In Stock')),
+                              DataCell(Text(product.totalStock.toString())),
+                              DataCell(_buildStockStatus(product.totalStock ?? 0)),
                             ]);
                           }).toList(),
                         ),
@@ -465,118 +686,466 @@ class _DashBoardContentState extends State<DashBoardContent> {
               ),
             ),
           ),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 300,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 6, right: 10, bottom: 10),
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: getMaxYValue(topProduct),
-                  barTouchData: BarTouchData(
-                    enabled: true,
-                    touchTooltipData: BarTouchTooltipData(
-                      tooltipBgColor: Colors.grey[800],
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        return BarTooltipItem(
-                          '${rod.toY.toInt()}',
-                          const TextStyle(color: Colors.white),
+        ),
+
+        const SizedBox(height: 24),
+        SizedBox(
+          height: 300,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 6, right: 10, bottom: 10),
+            child: BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: getMaxYValue(topProduct),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    tooltipBgColor: Colors.grey[800],
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        '${rod.toY.toInt()}',
+                        const TextStyle(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (value, meta) {
+                        final top5Products = topProduct.take(5).toList();
+                        if (value.toInt() < top5Products.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: RotatedBox(
+                              quarterTurns: 1,
+                              child: Text(
+                                top5Products[value.toInt()].pname ?? '',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.left,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 50,
+                      getTitlesWidget: (value, meta) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Text(
+                            _formatYAxisLabel(value.toInt()),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 11,
+                            ),
+                          ),
                         );
                       },
                     ),
                   ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    rightTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 40, // Increased space for labels
-                        getTitlesWidget: (value, meta) {
-                          final top5Products = topProduct.take(5).toList();
-                          if (value.toInt() < top5Products.length) {
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: RotatedBox(
-                                quarterTurns: 1, // Rotate text 45 degrees
-                                child: Text(
-                                  top5Products[value.toInt()].pname ?? '',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  textAlign: TextAlign.left,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            );
-                          }
-                          return const Text('');
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 50, // More space for Y-axis labels
-                        getTitlesWidget: (value, meta) {
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: Text(
-                              _formatYAxisLabel(value.toInt()),
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 11,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: getMaxYValue(topProduct) / 5, // Dynamic grid lines
-                    getDrawingHorizontalLine: (value) {
-                      return FlLine(
-                        color: Colors.grey[200],
-                        strokeWidth: 1,
-                      );
-                    },
-                  ),
-                  borderData: FlBorderData(
-                    show: true,
-                    border: Border(
-                      bottom: BorderSide(color: Colors.grey[300]!),
-                      left: BorderSide(color: Colors.grey[300]!),
-                    ),
-                  ),
-                  barGroups: topProduct
-                      .take(5)
-                      .map((product) => _createBarGroup(
-                    topProduct.indexOf(product).toDouble(),
-                    product.productCount?.toDouble() ?? 0,
-                  ))
-                      .toList(),
                 ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: getMaxYValue(topProduct) / 5,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey[200],
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey[300]!),
+                    left: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+                barGroups: topProduct
+                    .take(5)
+                    .map((product) => _createBarGroup(
+                  topProduct.indexOf(product).toDouble(),
+                  product.productQuantity?.toDouble() ?? 0,
+                ))
+                    .toList(),
               ),
             ),
-          )
-        ],
-      ),
+          ),
+        )
+      ],
     );
   }
 
-// Helper function to create bar groups
+// Top Retailers Content
+  Widget _buildTopRetailersContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Top Retailers',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.download),
+              label: const Text('Export'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: Scrollbar(
+            thumbVisibility: true,
+            trackVisibility: true,
+            child: ListView.builder(
+              itemCount: topParties.length,
+              itemBuilder: (context, index) {
+                final retailer = topParties[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue[100],
+                    child: Text(
+                      retailer.partyname?[0] ?? '',
+                      style: TextStyle(color: Colors.blue[800]),
+                    ),
+                  ),
+                  title: Text(
+                    retailer.partyname ?? 'Unknown',
+                    style: const TextStyle(fontWeight: FontWeight.w600,fontSize: 13),
+                  ),
+                  subtitle: Text('Total Invoices: ${retailer.invcount}'),
+                  trailing: Text(
+                    '₹${retailer.invamt?.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: (retailer.invamt ?? 0) >= 0
+                          ? Colors.green
+                          : Colors.red,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Optional: Add a pie chart or bar chart for retailers
+        SizedBox(
+          height: 300,
+          child:BarChart(
+            BarChartData(
+              alignment: BarChartAlignment.spaceAround,
+              maxY: getMaxYValueParties(topParties),
+              barTouchData: BarTouchData(
+                enabled: true,
+                touchTooltipData: BarTouchTooltipData(
+                  tooltipBgColor: Colors.grey[800],
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    return BarTooltipItem(
+                      '${rod.toY.toInt()}',
+                      const TextStyle(color: Colors.white),
+                    );
+                  },
+                ),
+              ),
+              titlesData: FlTitlesData(
+                show: true,
+                rightTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 40,
+                    getTitlesWidget: (value, meta) {
+                      final top5Products = topParties.take(5).toList();
+                      if (value.toInt() < top5Products.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: RotatedBox(
+                            quarterTurns: 1,
+                            child: Text(
+                              top5Products[value.toInt()].partyname ?? '',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.left,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        );
+                      }
+                      return const Text('');
+                    },
+                  ),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 50,
+                    getTitlesWidget: (value, meta) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8.0),
+                        child: Text(
+                          _formatYAxisLabel(value.toInt()),
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 11,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              gridData: FlGridData(
+                show: true,
+                drawVerticalLine: false,
+                horizontalInterval: getMaxYValueParties(topParties) / 5,
+                getDrawingHorizontalLine: (value) {
+                  return FlLine(
+                    color: Colors.grey[200],
+                    strokeWidth: 1,
+                  );
+                },
+              ),
+              borderData: FlBorderData(
+                show: true,
+                border: Border(
+                  bottom: BorderSide(color: Colors.grey[300]!),
+                  left: BorderSide(color: Colors.grey[300]!),
+                ),
+              ),
+              barGroups: topParties
+                  .take(5)
+                  .map((product) => _createBarGroup(
+                topParties.indexOf(product).toDouble(),
+                product.invamt?.toDouble() ?? 0,
+              ))
+                  .toList(),
+            ),
+          )
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopSalesmanContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Top Salesman',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () {},
+              icon: const Icon(Icons.download),
+              label: const Text('Export'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: Scrollbar(
+            thumbVisibility: true,
+            trackVisibility: true,
+            child: ListView.builder(
+              itemCount: topSalesMan.length,
+              itemBuilder: (context, index) {
+                final retailer = topSalesMan[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.blue[100],
+                    child: Text(
+                      retailer.sman?[0] ?? '',
+                      style: TextStyle(color: Colors.blue[800]),
+                    ),
+                  ),
+                  title: Text(
+                    retailer.sman ?? 'Unknown',
+                    style: const TextStyle(fontWeight: FontWeight.w600,fontSize: 13),
+                  ),
+                  subtitle: Text('Status: ${retailer.status}'),
+                  trailing: Text(
+                    '₹${retailer.invamt?.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: (retailer.invamt ?? 0) >= 0
+                          ? Colors.green
+                          : Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Optional: Add a pie chart or bar chart for retailers
+        SizedBox(
+            height: 300,
+            child:BarChart(
+              BarChartData(
+                alignment: BarChartAlignment.spaceAround,
+                maxY: getMaxYValueSalesman(topSalesMan),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    tooltipBgColor: Colors.grey[800],
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      return BarTooltipItem(
+                        '${rod.toY.toInt()}',
+                        const TextStyle(color: Colors.white),
+                      );
+                    },
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  show: true,
+                  rightTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 40,
+                      getTitlesWidget: (value, meta) {
+                        final top5Products = topSalesMan.take(5).toList();
+                        if (value.toInt() < top5Products.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: RotatedBox(
+                              quarterTurns: 1,
+                              child: Text(
+                                top5Products[value.toInt()].sman ?? '',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                textAlign: TextAlign.left,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 50,
+                      getTitlesWidget: (value, meta) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Text(
+                            _formatYAxisLabel(value.toInt()),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 11,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: getMaxYValueSalesman(topSalesMan) / 5,
+                  getDrawingHorizontalLine: (value) {
+                    return FlLine(
+                      color: Colors.grey[200],
+                      strokeWidth: 1,
+                    );
+                  },
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey[300]!),
+                    left: BorderSide(color: Colors.grey[300]!),
+                  ),
+                ),
+                barGroups: topSalesMan
+                    .take(5)
+                    .map((product) => _createBarGroup(
+                  topSalesMan.indexOf(product).toDouble(),
+                  product.invamt?.toDouble() ?? 0,
+                ))
+                    .toList(),
+              ),
+            )
+        ),
+      ],
+    );
+  }
+
+
+// Helper method to assign consistent colors to retailers
+  Color _getColorForRetailer(String? name) {
+    // You can implement a more sophisticated color assignment logic
+    final colors = [
+      Colors.blue[400]!,
+      Colors.green[400]!,
+      Colors.orange[400]!,
+      Colors.purple[400]!,
+      Colors.teal[400]!,
+    ];
+
+    // Simple hash-based color selection
+    return colors[name.hashCode % colors.length];
+  }
+
   BarChartGroupData _createBarGroup(double x, double y) {
     return BarChartGroupData(
       x: x.toInt(),
@@ -584,7 +1153,7 @@ class _DashBoardContentState extends State<DashBoardContent> {
         BarChartRodData(
           toY: y,
           color: Colors.blue.withOpacity(0.8),
-          width: 20, // Reduced width for better spacing
+          width: isTablet ? 30:20, // Reduced width for better spacing
           borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
         ),
       ],
@@ -593,33 +1162,58 @@ class _DashBoardContentState extends State<DashBoardContent> {
 
   // Helper function to format Y-axis labels
   String _formatYAxisLabel(int value) {
+    // Implement a method to avoid overlapping and improve readability
+    if (value == 0) return '0';
+
+    // Use abbreviated formats for larger numbers
     if (value >= 1000000) {
       return '${(value / 1000000).toStringAsFixed(1)}M';
     } else if (value >= 1000) {
       return '${(value / 1000).toStringAsFixed(1)}K';
     }
+
+    // For smaller numbers, potentially add some spacing or formatting
     return value.toString();
   }
 
 // Helper function to get max Y value (updated for better scaling)
-  double getMaxYValue(List<dynamic> products) {
-    if (products.isEmpty) return 1000;
+  double getMaxYValue(List<TopProduct> products) {
+    if (products.isEmpty) return 0;
 
-    int maxCount = products.take(5)
-        .map((p) => p.productCount ?? 0)
-        .reduce((curr, next) => curr > next ? curr : next);
+    // Find the maximum product quantity
+    double maxQuantity = products
+        .map((product) => product.productQuantity?.toDouble() ?? 0)
+        .reduce((a, b) => a > b ? a : b);
 
-    // Round up to the nearest nice number for better Y-axis labels
-    double maxY = (maxCount * 1.2).toDouble(); // Add 20% padding
-
-    if (maxY >= 1000000) {
-      return (maxY / 1000000).ceil() * 1000000;
-    } else if (maxY >= 1000) {
-      return (maxY / 1000).ceil() * 1000;
-    } else {
-      return (maxY / 100).ceil() * 100;
-    }
+    // Add some padding (e.g., 10-20%) to ensure all bars fit comfortably
+    return maxQuantity * 1.2;
   }
+
+
+  double getMaxYValueParties(List<TopParties> products) {
+    if (products.isEmpty) return 0;
+
+    // Find the maximum product quantity
+    double maxQuantity = products
+        .map((product) => product.invamt?.toDouble() ?? 0)
+        .reduce((a, b) => a > b ? a : b);
+
+    // Add some padding (e.g., 10-20%) to ensure all bars fit comfortably
+    return maxQuantity * 1.2;
+  }
+
+  double getMaxYValueSalesman(List<TopSalesMan> products) {
+    if (products.isEmpty) return 0;
+
+    // Find the maximum product quantity
+    double maxQuantity = products
+        .map((product) => product.invamt?.toDouble() ?? 0)
+        .reduce((a, b) => a > b ? a : b);
+
+    // Add some padding (e.g., 10-20%) to ensure all bars fit comfortably
+    return maxQuantity * 1.2;
+  }
+
 
   // rows: [
   //
@@ -650,20 +1244,19 @@ class _DashBoardContentState extends State<DashBoardContent> {
   //   ),
   // ],
 
-  Widget _buildStockStatus(String status) {
+  Widget _buildStockStatus(num stockCount) {
+    String status;
     Color color;
-    switch (status.toLowerCase()) {
-      case 'in stock':
-        color = Colors.green;
-        break;
-      case 'low stock':
-        color = Colors.orange;
-        break;
-      case 'out of stock':
-        color = Colors.red;
-        break;
-      default:
-        color = Colors.grey;
+
+    if (stockCount < 10) {
+      status = 'Low Stock';
+      color = Colors.orange;
+    } else if (stockCount <= 50) {
+      status = 'Limited Stock';
+      color = Colors.yellow.shade700;
+    } else {
+      status = 'In Stock';
+      color = Colors.green;
     }
 
     return Container(
@@ -695,30 +1288,80 @@ class _DashBoardContentState extends State<DashBoardContent> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue[900]!.withOpacity(0.3),
+            spreadRadius: 2,
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Dashboard Overview',
-            style: GoogleFonts.poppins(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Dashboard Overview',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => _selectDate(context),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        DateFormat('yyyy-MM-dd').format(_selectedDate),
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.calendar_today,
+                        color: Colors.white,
+                        size: 14,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'Welcome back, Admin',
             style: GoogleFonts.poppins(
               fontSize: 16,
               color: Colors.white70,
+              fontWeight: FontWeight.w300,
             ),
           ),
         ],
       ),
     );
   }
+
 
   String formatCurrency(num value) {
     if (value >= 10000000) {
@@ -737,37 +1380,74 @@ class _DashBoardContentState extends State<DashBoardContent> {
   }
 
 
-  Widget _buildQuickStats(bool isTablet,double childAspectRatio) {
-    final stats = [
-      _StatItem(
-        icon: Icons.shopping_cart,
-        label: 'Total Orders',
-        value: '$totalOrder',
-        growth: '+12.5%',
-        color: Colors.blue,
-      ),
-      _StatItem(
-        icon: Icons.person,
-        label: 'Total Invoices',
-        value: '$totalInvoices',
-        growth: '+8.2%',
-        color: Colors.green,
-      ),
-      _StatItem(
-        icon: Icons.store,
-        label: 'Invoice Amount',
-        value: '₹$invAmt',
-        growth: '+5.7%',
-        color: Colors.purple,
-      ),
-      _StatItem(
-        icon: Icons.pending_actions,
-        label: 'Receivable',
-        value: '${formatCurrency(receivableBalance)}',
-        growth: '-2.4%',
-        color: Colors.orange,
-        isNegative: true,
-      ),
+  Widget _buildQuickStats(bool isTablet, double childAspectRatio) {
+    final statsGroups = [
+      [
+        _StatItem(
+          icon: Icons.shopping_cart,
+          label: 'Total Orders',
+          value: '$totalOrder',
+          growth: '$totalOrderPer%',
+          color: Colors.blue,
+        ),
+        _StatItem(
+          icon: Icons.shopping_cart,
+          label: 'Order Amount',
+          value: '$orderAmount',
+          growth: '$OrderAmtPer%',
+          color: Colors.blue,
+        ),
+      ],
+      [
+        _StatItem(
+          icon: Icons.store,
+          label: 'Total Invoices',
+          value: '$totalInvoices',
+          growth: '$totalInvoicePer%',
+          color: Colors.purple,
+        ),
+        _StatItem(
+          icon: Icons.store,
+          label: 'Invoice Amount',
+          value: '${formatCurrency(invAmt)}',
+          growth: '$InvoiceAmtPer%',
+          color: Colors.purple,
+        ),
+      ],
+      [
+        _StatItem(
+          icon: Icons.currency_rupee,
+          label: 'Stock Value',
+          value: '220',
+          growth: '+12.5%',
+          color: Colors.pinkAccent,
+        ),
+        _StatItem(
+          icon: Icons.currency_rupee,
+          label: 'Stock Amount',
+          value: '₹35000',
+          growth: '+5.7%',
+          color: Colors.pinkAccent,
+        ),
+      ],
+      [
+        _StatItem(
+          icon: Icons.pending_actions,
+          label: 'Receivable',
+          value: '${formatCurrency(receivableBalance)}',
+          growth: '-2.4%',
+          color: Colors.orange,
+          isNegative: true,
+        ),
+        _StatItem(
+          icon: Icons.pending_actions,
+          label: 'Payable',
+          value: '${formatCurrency(payableBalance)}',
+          growth: '-2.4%',
+          color: Colors.orange,
+          isNegative: true,
+        ),
+      ],
     ];
 
     return GridView.builder(
@@ -779,9 +1459,9 @@ class _DashBoardContentState extends State<DashBoardContent> {
         crossAxisSpacing: 14,
         mainAxisSpacing: 14,
       ),
-      itemCount: stats.length,
+      itemCount: statsGroups.length,
       itemBuilder: (context, index) {
-        final stat = stats[index];
+        final statGroup = statsGroups[index];
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -795,64 +1475,76 @@ class _DashBoardContentState extends State<DashBoardContent> {
               ),
             ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: CarouselSlider(
+            options: CarouselOptions(
+              height: double.infinity,
+              viewportFraction: 1.0,
+              scrollDirection: Axis.vertical,
+              autoPlay: true,
+              autoPlayInterval: const Duration(seconds: 3),
+              autoPlayAnimationDuration: const Duration(milliseconds: 800),
+              autoPlayCurve: Curves.fastOutSlowIn,
+            ),
+            items: statGroup.map((stat) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: stat.color.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(stat.icon, color: stat.color),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: stat.isNegative
-                          ? Colors.red.withOpacity(0.1)
-                          : Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      stat.growth,
-                      style: TextStyle(
-                        color: stat.isNegative ? Colors.red : Colors.green,
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: stat.color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(stat.icon, color: stat.color),
                       ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: stat.isNegative
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          stat.growth,
+                          style: TextStyle(
+                            color: stat.isNegative ? Colors.red : Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    stat.value,
+                    style: GoogleFonts.poppins(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    stat.label,
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey[600],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                stat.value,
-                style: GoogleFonts.poppins(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                stat.label,
-                style: GoogleFonts.poppins(
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
+              );
+            }).toList(),
           ),
         );
       },
     );
   }
-
   Widget _buildRevenueSection(bool isTablet, List<dynamic> data, int checkHighScore) {
     final DateTime currentDate = DateTime.now();
     final List<DateTime> last7Days = List.generate(
@@ -1158,11 +1850,12 @@ class _DashBoardContentState extends State<DashBoardContent> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.vertical,
                 child: DataTable(
-                  columnSpacing: 24.0,
-                  horizontalMargin: 16.0,
+                  columnSpacing: 12.0,
+                  horizontalMargin: 10.0,
                   columns: const [
                     DataColumn(
-                      label: Text(
+                      label:
+                      Text(
                         'Name',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
@@ -1183,7 +1876,16 @@ class _DashBoardContentState extends State<DashBoardContent> {
                   ],
                   rows: topSalesMan.map((salesMan) {
                     return DataRow(cells: [
-                      DataCell(Text(salesMan.sman ?? 'N/A')),
+                      DataCell(
+                        SizedBox(
+                          width: 134, // Set a fixed width for the name column
+                          child: Text(
+                            salesMan.sman ?? 'N/A',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontWeight: FontWeight.normal),
+                          ),
+                        ),
+                      ),
                       DataCell(Text(_formatCurrency(salesMan.invamt))),
                       DataCell(
                         Text(

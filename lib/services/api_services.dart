@@ -18,18 +18,18 @@ class ApiConfig {
   static const String updateProfile = "/update_all_type_user";
   static const String changePassword = "/verify_password";
   static const String dropDownInvoice = "/dist_dropdown";
-  static const String getInvoiceList = "/get_inv_header";
+  static const String getInvoiceList = "/get_inv_header1";
   static const String getSalesMan = "/get_sales_man";
   static const String getAdminList = "/get_admin_user_profile";
   static const String addUser = "/o_user_d";
   static const String getOrder = "/get_order";
-  static const String getDraftOrder = "/get_draft_list";
-  static const String getOrderDetails = "/get_product_by_ohid";
+  static const String getDraftOrder = "/get_draft_list1";
+  static const String getOrderDetails = "/get_product_by_ohid1";
   static const String getOutStandingList = "/get_party_wise_receivable_total";
-  static const String getPartyProduct = "/get_dist_party_product1";
+  static const String getPartyProduct = "/get_dist_party_product";
   static const String getReceivable = "/get_receiable";
-  static const String getFrequently = "/dist_freq_prod";
-  static const String getBounced = "/sale_loss";
+  static const String getFrequently = "/dist_freq_prod1";
+  static const String getBounced = "/sale_loss1";
   static const String createOrder = "/create_order";
   static const String getMappedProduct = "/matching_product";
   static const String getUnMappedProduct = "/get_unmatched_product";
@@ -47,7 +47,7 @@ class ApiConfig {
   static const String countOrder = "/countOrder";
   static const String get_top_10_salesmen = "/get_top_10_salesmen";
   static const String get_top_100_product = "/get_top_100_product";
-
+  static const String get_top_10_parties = "/get_top_10_parties";
 
   static String getHeader(){
     return '$header';
@@ -208,5 +208,8 @@ class ApiConfig {
 
   static String reqGet_top_100_product(){
     return '$baseUrl$get_top_100_product';
+  }
+  static String reqGet_top_10_parties(){
+    return '$baseUrl$get_top_10_parties';
   }
 }

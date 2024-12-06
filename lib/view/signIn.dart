@@ -261,7 +261,8 @@ class _SignInState extends State<SignIn> with TickerProviderStateMixin {
           await prefs.setInt('u_id', loginResponse.data!.userId!);
           await prefs.setInt('companyId', loginResponse.data!.companyId!);
           await prefs.setInt('smid', loginResponse.data!.smid!);
-
+          await prefs.setBool('isWeekly', loginResponse.data!.isWeekly!);
+          await prefs.setString('grpCode', loginResponse.data!.grpCode.toString());
           // Save the login status
           await prefs.setBool('isLoggedIn', true);
 

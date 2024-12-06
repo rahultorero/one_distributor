@@ -69,6 +69,8 @@ class _UsersListScreenState extends State<UsersListScreen> {
       "code": regCode,
     };
 
+    print("userData${userData}");
+
     try {
       final response = await http.post(
         Uri.parse(apiUrl),
@@ -377,6 +379,9 @@ class _AddUserScreenState extends State<AddUserScreen> {
   int? _selectFXIdSales;
   List<SalesManModel> salesmen = []; // Replace with actual salesmen
   late bool _isPasswordVisible = false;
+  bool _isWeekly = false;
+
+
   Future<void> _selectDate(BuildContext context, bool isDateOfBirth) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -509,7 +514,8 @@ class _AddUserScreenState extends State<AddUserScreen> {
       "Id_Role": 0,
       "id":prefs.getInt("u_id"),
       "fxd_usertype": 2,
-      "smid": _selectFXIdSales,
+      "smanid": _selectFXIdSales,
+      "isweekly":_isWeekly
     };
 
 
@@ -578,10 +584,12 @@ class _AddUserScreenState extends State<AddUserScreen> {
       "Id_Role": 0, // Set according to your role
       "fxd_usertype": 2, // Keep as per your requirement
       "id":prefs.getInt("u_id"),
-      "smid": _selectFXIdSales, // Set according to your requirement
+      "smanid": _selectFXIdSales, // Set according to your requirement
+      "isweekly":_isWeekly
     };
 
 
+    print("checkk the body${userData}");
 
     try {
       final response = await http.post(
@@ -1032,16 +1040,35 @@ class _AddUserScreenState extends State<AddUserScreen> {
                         SearchableDropdown(
                           items: salesmen,
                           value: _selectedSalesman,
-                          labelText: 'Select Salesman *',
+                          labelText: 'Select Salesman ',
                           onChanged: (SalesManModel? newValue) {
                             setState(() {
                               _selectedSalesman = newValue;
                               _selectFXIdSales = newValue?.smanid;
                             });
                           },
-                          validator: (value) => value == null ? 'Please select a salesman' : null,
                         ),
-                      ],
+                  _selectedSalesman == null
+                      ? Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Text(
+                      'Please select a salesman to enable this option.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey, // Or any other color you want for the message
+                      ),
+                    ),
+                  )
+                      : buildSwitchWithLabel(
+                    value: _isWeekly,
+                    onChanged: (newValue) {
+                      setState(() {
+                        _isWeekly = newValue;
+                      });
+                    },
+                  )
+                  ],
                     ),
                   ),
                 ),
@@ -1113,6 +1140,51 @@ class _AddUserScreenState extends State<AddUserScreen> {
       ),
     );
   }
+
+  Widget buildSwitchWithLabel({
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    String label = 'isWeekly',
+    IconData icon = Icons.toggle_off_outlined,
+  }) {
+    // Text style for the label
+    final TextStyle labelStyle = TextStyle(
+      fontSize: 18,
+      fontWeight: FontWeight.normal,
+      color: Colors.black,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 24,
+            color: Colors.black,
+          ),
+          SizedBox(width: 10), // Space between icon and text
+          Text(
+            label,
+            style: labelStyle,
+          ),
+          SizedBox(width: 80), // Space between text and switch
+          Switch(
+
+            value: value,
+            onChanged: onChanged,
+            activeColor: Colors.green,
+            inactiveThumbColor: Colors.red,
+            activeTrackColor: Colors.green.withOpacity(0.5),
+            inactiveTrackColor: Colors.red.withOpacity(0.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
 }
 
@@ -1296,6 +1368,8 @@ class _SearchableDropdownState extends State<SearchableDropdown> {
       },
     );
   }
+
+
 
   @override
   void dispose() {

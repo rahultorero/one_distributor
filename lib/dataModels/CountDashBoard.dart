@@ -1,16 +1,16 @@
 class CountDashBoard {
   String? message;
-  int? statusCode;
-  int? syncCount;
-  int? notSyncCount;
-  int? totalInvoice;
-  int? invamtprecentage;
-  int? invamt;
-  int? totalInvoicePercentage;
-  int? totalOrderPercentage;
-  int? totalOrder;
-  double? totalOrderAmtPercentage;
-  double? totalAmtOrder;
+  num? statusCode;
+  num? syncCount;
+  num? notSyncCount;
+  num? totalInvoice;
+  num? invamtprecentage;
+  num? invamt;
+  num? totalInvoicePercentage;
+  num? totalOrderPercentage;
+  num? totalOrder;
+  num? totalOrderAmtPercentage;
+  num? totalAmtOrder;
 
   CountDashBoard(
       {this.message,
@@ -33,9 +33,9 @@ class CountDashBoard {
     notSyncCount = json['notSyncCount'];
     totalInvoice = json['totalInvoice'];
     invamtprecentage = json['invamtprecentage'];
-    invamt = json['invamt'];
+    invamt = (json['invamt'] ?? 0.0).toDouble();
     totalInvoicePercentage = json['totalInvoicePercentage'];
-    totalOrderPercentage = json['totalOrderPercentage'];
+    totalOrderPercentage = (json['totalOrderPercentage'] ?? 0.0).toDouble();
     totalOrder = json['totalOrder'];
     totalOrderAmtPercentage = json['totalOrderAmtPercentage'];
     totalAmtOrder = json['totalAmtOrder'];

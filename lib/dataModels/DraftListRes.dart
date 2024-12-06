@@ -267,7 +267,6 @@ class OrderDetail {
   final dynamic pcode;
   final dynamic companyName;
   final dynamic package;
-  final dynamic packUnit;
 
   OrderDetail({
     this.odid,
@@ -289,7 +288,6 @@ class OrderDetail {
     this.pcode,
     this.companyName,
     this.package,
-    this.packUnit,
   });
 
   factory OrderDetail.fromJson(Map<String, dynamic> json) {
@@ -313,7 +311,6 @@ class OrderDetail {
       pcode: json['pcode'],
       companyName: json['companyname'],
       package: json['package'],
-      packUnit: json['packunit'],
     );
   }
 
@@ -338,7 +335,6 @@ class OrderDetail {
       'pcode': pcode,
       'companyname': companyName,
       'package': package,
-      'packunit': packUnit,
     };
   }
 }

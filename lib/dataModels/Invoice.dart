@@ -177,8 +177,7 @@ class ItemDetail {
   String duedate;
   int smanid;
   String pname;
-  String packageUnit;
-  int packUnit;
+  String package;
 
   ItemDetail({
     required this.regcode,
@@ -210,8 +209,7 @@ class ItemDetail {
     required this.duedate,
     required this.smanid,
     required this.pname,
-    required this.packageUnit,
-    required this.packUnit,
+    required this.package,
   });
 
   factory ItemDetail.fromJson(Map<String, dynamic> json) {
@@ -245,8 +243,7 @@ class ItemDetail {
       duedate: json['duedate'] ?? '',
       smanid: json['smanid'] ?? 0,
       pname: json['pname'] ?? '',
-      packageUnit: json['package_unit'] ?? '',
-      packUnit: json['pack_unit'] ?? 0,
+      package: json['package'] ?? '',
     );
   }
 }

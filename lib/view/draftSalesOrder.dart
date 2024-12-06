@@ -236,6 +236,7 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
     List<int> d_companyId = [];
     List<ProductList> products = widget.draftOrder.details.map((selectedProduct) {
       print("company iddd checkkkk ${selectedProduct.companyId}");
+      print("company groupppp checkkkk ${ widget.draftOrder.regCode}");
       int? selectedCompanyId = selectedProduct.companyId;
       if (!d_companyId.contains(selectedCompanyId)) {
         d_companyId.add(selectedCompanyId!);
@@ -267,7 +268,7 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
       userType: "Distributor",
       dType: _selectedDeliveryId,
       remark: widget.draftOrder.oreMark,
-      grpCode: widget.draftOrder.grpCode ?? widget.draftOrder.regCode,
+      grpCode: _selectGroupCode ?? widget.draftOrder.regCode,
       ohid: widget.draftOrder.ohid,
       orderStatus: 1,
     );
@@ -831,14 +832,14 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
                               qty: items.qty ?? 0,
                               free: items.free,
                               schPercentage: "",
-                              rate: double.parse(items!.ptr ?? '0.0'),
-                              mrp: items?.mrp,
-                              ptr: items?.ptr,
+                              rate: items!.ptr ?? 0.0,
+                              mrp: items?.mrp.toString(),
+                              ptr: items?.ptr.toString(),
                               amount: "0",
                               remark: items.remark,
                               companyid: items.dCompanyid,
                               pid: items?.pid,
-                              stock: items.totalStock,
+                              stock: items.totalStock.toString(),
                               odid: 0,
                             ),
                           ];
@@ -906,14 +907,14 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
                               qty: items.qty ?? 0,
                               free: items.free,
                               schPercentage: "",
-                              rate: double.parse(items!.ptr ?? '0.0'),
-                              mrp: items?.mrp,
-                              ptr: items?.ptr,
+                              rate: items!.ptr ?? 0.0,
+                              mrp: items?.mrp.toString(),
+                              ptr: items?.ptr.toString(),
                               amount: "0",
                               remark: items.remark,
                               companyid: items.dCompanyid,
                               pid: items?.pid,
-                              stock: items.totalStock,
+                              stock: items.totalStock.toString(),
                               odid: 0,
                             ),
                           ];
@@ -1214,7 +1215,7 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
                                                           companyid: _selectedProduct?.dCompanyid,
                                                           pid: _selectedProduct?.pid,
                                                           odid: 0,
-                                                          stock: _selectedProduct?.totalStock!
+                                                          stock: _selectedProduct?.totalStock!.toString()
                                                       ),
 
                                                     ];
@@ -2183,7 +2184,7 @@ class _DraftSalesOrderState extends State<DraftSalesOrder> with SingleTickerProv
             remark: selectRemark?.text,
             companyid: items.dCompanyid,
             pid: items?.pid,
-            stock: items.totalStock,
+            stock: items.totalStock.toString(),
             odid: 0,
           ),
         ];

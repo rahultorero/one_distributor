@@ -76,7 +76,7 @@ class ProductList {
   int? pid;
   int? odid;
   String? stock;
-  double? get total => qty! * rate!;
+  double? get total => qty * (rate ?? 0);
 
   ProductList(
       {
@@ -99,12 +99,15 @@ class ProductList {
         this.odid});
 
   ProductList.fromJson(Map<String, dynamic> json) {
+    name = json['name'];
+    packing = json['packing'];
+    scheme = json['scheme'];
     itemDetailid = json['item_detailid'];
     ledidParty = json['ledid_party'];
-    qty = json['qty'];
-    free = json['free'] ?? 0;
+    qty = json['qty'] ?? 0; // Ensure `qty` is not null
+    free = json['free'] ?? 0; // Provide default value if null
     schPercentage = json['sch_percentage'];
-    rate = json['rate'];
+    rate = (json['rate'] != null) ? (json['rate'] is int ? (json['rate'] as int).toDouble() : json['rate']) : null;
     mrp = json['mrp'];
     ptr = json['ptr'];
     amount = json['amount'];
@@ -112,23 +115,28 @@ class ProductList {
     companyid = json['companyid'];
     pid = json['pid'];
     odid = json['odid'];
+    stock = json['stock'];
   }
 
   Map<String, dynamic> toJson() {
-    final Map<String, dynamic> data = new Map<String, dynamic>();
-    data['item_detailid'] = this.itemDetailid;
-    data['ledid_party'] = this.ledidParty;
-    data['qty'] = this.qty;
-    data['free'] = this.free;
-    data['sch_percentage'] = this.schPercentage;
-    data['rate'] = this.rate;
-    data['mrp'] = this.mrp;
-    data['ptr'] = this.ptr;
-    data['amount'] = this.amount;
-    data['remark'] = this.remark;
-    data['companyid'] = this.companyid;
-    data['pid'] = this.pid;
-    data['odid'] = this.odid;
-    return data;
+    return {
+      'name': name,
+      'packing': packing,
+      'scheme': scheme,
+      'item_detailid': itemDetailid,
+      'ledid_party': ledidParty,
+      'qty': qty,
+      'free': free,
+      'sch_percentage': schPercentage,
+      'rate': rate,
+      'mrp': mrp,
+      'ptr': ptr,
+      'amount': amount,
+      'remark': remark,
+      'companyid': companyid,
+      'pid': pid,
+      'odid': odid,
+      'stock': stock,
+    };
   }
 }

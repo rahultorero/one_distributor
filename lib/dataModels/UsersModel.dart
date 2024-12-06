@@ -20,7 +20,7 @@ class UserListRes {
   final bool isWeekly;
   final int smanid;
   final int verifyStatus;
-  final String? otp;            // Nullable
+  final int? otp;            // Nullable
   final String? otpTimestamp;   // Nullable
   final String? salesmanName;   // Nullable
 
@@ -131,7 +131,7 @@ class UserListRes {
     bool? isWeekly,
     int? smanid,
     int? verifyStatus,
-    String? otp,
+    int? otp,
     String? otpTimestamp,
     String? salesmanName,
   }) {

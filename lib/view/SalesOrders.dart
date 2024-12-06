@@ -218,7 +218,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
     // Assuming we want cards to take up roughly 1/3 of screen height on phones
     // and 1/2 of that on tablets
     final desiredCardHeight = isTablet
-        ? screenHeight * 0.405  // For tablets
+        ? screenHeight * 0.191  // For tablets
         : isSmallScreen
         ? screenHeight * 0.252 // For phones
         :screenHeight * 0.245;
@@ -907,7 +907,7 @@ class _SalesOrderListState extends State<SalesOrderList> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => OrderBottomSheet(ocId: order.ohid,orderId: order.orderNo,companyName: order.partyName,),
+      builder: (context) => OrderBottomSheet(ocId: order.ohid,orderId: order.orderNo,companyName: order.partyName,regcode: regCode ?? "",),
     );
   }
 
@@ -920,7 +920,8 @@ class OrderBottomSheet extends StatefulWidget {
   final int ocId;
   final String orderId;
   final String companyName;
-  const OrderBottomSheet({Key? key, required this.ocId, required this.orderId,required this.companyName}) : super(key: key);
+  final String regcode;
+  const OrderBottomSheet({Key? key, required this.ocId, required this.orderId,required this.companyName,required this.regcode}) : super(key: key);
 
   @override
   _OrderBottomSheetState createState() => _OrderBottomSheetState();
@@ -1093,7 +1094,7 @@ class _OrderBottomSheetState extends State<OrderBottomSheet> {
     // Prepare the body including 'ohid' and 'reg_code'
     final body = {
       'ohid': widget.ocId, // Use ocId as 'ohid'
-      'reg_code': 'D000004',
+      'reg_code': widget.regcode,
     };
 
     try {

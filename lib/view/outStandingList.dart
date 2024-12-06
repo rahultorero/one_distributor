@@ -50,6 +50,7 @@ class _OutStandingListState extends State<OutStandingList> {
   bool _isSearchVisible = false;
   bool _isDateRangeVisible = false;
   String? regCode;
+  String? grpCode;
   int? companyId;
   List<Store> stores = [];
   String? selectedRegCode;
@@ -90,6 +91,7 @@ class _OutStandingListState extends State<OutStandingList> {
     try {
       // Fetch division
       regCode = await _getDivision();
+      grpCode = await _getGrpCode();
       companyId = await _getCompanyId();
       if (regCode != null) {
         // Fetch companies using the division value
@@ -111,6 +113,12 @@ class _OutStandingListState extends State<OutStandingList> {
     print("check the value ${prefs.getString("reg_code")}");
     return prefs.getString("reg_code"); // Replace with your key
   }
+  Future<String?> _getGrpCode() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    print("check the value ${prefs.getString("grpCode")}");
+    return prefs.getString("grpCode"); // Replace with your key
+  }
+
 
   Future<int?> _getCompanyId() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -147,7 +155,7 @@ class _OutStandingListState extends State<OutStandingList> {
     final Map<String, dynamic> body = {
       'company_id': companyId,
       'page': 1,
-      'regcode': regCode?.substring(0, 7),
+      'regcode': grpCode!.isNotEmpty ? grpCode : (regCode?.substring(0, 7) ?? ''),
       'userInput': searchController.text,
     };
 

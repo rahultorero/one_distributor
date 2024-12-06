@@ -43,7 +43,7 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
       for (var item in widget.frequently.data!) {
         if (item != null) {
           frequentlyList.add(item);
-          item.rate = double.parse(item.ptr!);
+          item.rate = item.ptr;
         }
       }
     });
@@ -160,7 +160,7 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
 
 
   Widget _buildProductCard(FrequentlyItems product, int index) {
-    _rateController = TextEditingController(text: product.ptr ?? "");
+    _rateController = TextEditingController(text: product.ptr.toString());
     _remarkController = TextEditingController(text: product.remark ?? "");
 
 
@@ -306,7 +306,45 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
                         ),
                       ],
                     ),
-
+                    SizedBox(height: 15,),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center, // Aligns children to the end of the Row
+                      children: [
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center, // Align text to the right
+                            children: [
+                              _buildDetailItems(
+                                'T Qty',
+                                (product.tqty == null || product.tqty == 0) ? '--' : product.tqty.toString(),
+                                textStyle: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center, // Align text to the right
+                            children: [
+                              _buildDetailItems(
+                                'PTime',
+                                (product.ptime == null || product.ptime == 0) ? '--' : product.ptime.toString(),
+                                textStyle: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     SizedBox(height: 10),
                     Row(
                       children: [
@@ -355,6 +393,30 @@ class _FrequentPurchaseBottomSheetState extends State<FrequentPurchaseBottomShee
     );
   }
 
+  Widget _buildDetailItems(String label, String value, {TextStyle? textStyle}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          value,
+          style: textStyle ?? TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildInfoChip(String label, Color color) {
     return Container(
